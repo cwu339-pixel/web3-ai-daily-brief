@@ -13,6 +13,8 @@ from src.generator.report_builder import ReportBuilder
 from src.models.content_item import ContentItem
 from src.scrapers.coindesk_scraper import CoinDeskScraper
 from src.scrapers.cointelegraph_scraper import CoinTelegraphScraper
+from src.scrapers.hackernews_scraper import HackerNewsScraper
+from src.scrapers.reddit_scraper import RedditScraper
 from src.scrapers.github_scraper import (
     AI_KEYWORDS,
     WEB3_KEYWORDS,
@@ -21,7 +23,7 @@ from src.scrapers.github_scraper import (
 
 logger = logging.getLogger(__name__)
 
-AVAILABLE_SOURCES = ("github", "coindesk", "cointelegraph")
+AVAILABLE_SOURCES = ("github", "coindesk", "cointelegraph", "reddit", "hackernews")
 
 
 def main():
@@ -34,6 +36,7 @@ def main():
   %(prog)s generate                          生成今日简报（全部数据源）
   %(prog)s generate --sources github         只用 GitHub Trending
   %(prog)s generate --sources coindesk       只用 CoinDesk 新闻
+  %(prog)s generate --sources reddit hn      只用 Reddit + HN
   %(prog)s generate --ai-only               只生成 AI 简报
   %(prog)s generate --max 10                 每源最多处理 10 条
         """,
@@ -121,7 +124,41 @@ def _scrape_all_sources(sources, args):
     if "cointelegraph" in sources:
         all_items.extend(_scrape_rss("CoinTelegraph", CoinTelegraphScraper()))
 
+    if "reddit" in sources:
+        all_items.extend(_scrape_reddit())
+
+    if "hackernews" in sources:
+        all_items.extend(_scrape_hackernews())
+
     return all_items
+
+
+def _scrape_reddit():
+    """Scrape Reddit r/MachineLearning hot posts."""
+    print("正在爬取 Reddit r/MachineLearning...")
+    try:
+        scraper = RedditScraper(subreddit="MachineLearning", sort="hot")
+        items = scraper.fetch(max_items=10)
+        print(f"   找到 {len(items)} 条 Reddit 帖子")
+        return items
+    except Exception as e:
+        logger.warning("Failed to fetch Reddit: %s", e)
+        print("   Reddit 爬取失败，跳过")
+        return []
+
+
+def _scrape_hackernews():
+    """Scrape Hacker News AI-related top stories."""
+    print("正在爬取 Hacker News (AI)...")
+    try:
+        scraper = HackerNewsScraper(min_points=10)
+        items = scraper.fetch(max_items=10)
+        print(f"   找到 {len(items)} 条 HN 故事")
+        return items
+    except Exception as e:
+        logger.warning("Failed to fetch HackerNews: %s", e)
+        print("   Hacker News 爬取失败，跳过")
+        return []
 
 
 def _scrape_github(args):

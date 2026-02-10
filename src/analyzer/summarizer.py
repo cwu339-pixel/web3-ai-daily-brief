@@ -7,6 +7,7 @@ To avoid runtime failures, support both SDKs and pick whichever is installed.
 import json
 import logging
 import os
+import time
 from typing import Any, Dict, List, Union
 
 _GENAI_BACKEND = "unknown"
@@ -30,6 +31,13 @@ logger = logging.getLogger(__name__)
 class Summarizer:
     """Analyze content items using the Gemini API."""
 
+    # Free tier: 5 RPM → wait 13s between calls to stay safely under limit.
+    # Paid tier users can set GEMINI_RPM env var to override (e.g. "60").
+    _DEFAULT_FREE_TIER_RPM = 5
+    _MIN_REQUEST_INTERVAL = 60.0 / _DEFAULT_FREE_TIER_RPM  # 12 seconds
+    _MAX_RETRIES = 3
+    _RETRY_BACKOFF = 35  # seconds to wait after a 429 before retrying
+
     def __init__(self, api_key: str = None):
         """Initialize Summarizer.
 
@@ -49,6 +57,13 @@ class Summarizer:
         self.model_id = "gemini-2.5-flash"
         self.backend = _GENAI_BACKEND
 
+        # Rate-limit state: track when the last API call was made
+        self._last_call_ts: float = 0.0
+
+        # Allow paid-tier users to raise the RPM via env var
+        rpm = int(os.getenv("GEMINI_RPM", str(self._DEFAULT_FREE_TIER_RPM)))
+        self._request_interval = 60.0 / max(rpm, 1)
+
         if self.backend == "google-genai":
             self.client = _genai.Client(api_key=resolved_key)
             self.model = None
@@ -64,7 +79,7 @@ class Summarizer:
         """Summarize a single content item.
 
         Accepts both ContentItem and legacy Dict format for backward
-        compatibility.
+        compatibility. Applies rate limiting and retries on 429 errors.
 
         Returns:
             Dict with original fields + summary, category, importance.
@@ -74,27 +89,57 @@ class Summarizer:
 
         prompt = build_prompt(item)
 
-        try:
-            if self.backend == "google-genai":
-                response = self.client.models.generate_content(
-                    model=self.model_id, contents=prompt
-                )
-                text = response.text
-            else:
-                response = self.model.generate_content(prompt)
-                text = response.text
+        for attempt in range(self._MAX_RETRIES):
+            self._wait_for_rate_limit()
+            try:
+                text = self._call_api(prompt)
+                analysis = self._parse_json_response(text)
+                return {**item.to_dict(), **analysis}
 
-            analysis = self._parse_json_response(text)
-            return {**item.to_dict(), **analysis}
+            except Exception as e:
+                err_str = str(e)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                is_last_attempt = attempt == self._MAX_RETRIES - 1
 
-        except Exception as e:
-            logger.warning("Error summarizing %s: %s", item.title, e)
-            return {
-                **item.to_dict(),
-                "summary": item.description[:50] + "...",
-                "category": "其他",
-                "importance": 5,
-            }
+                if is_rate_limit and not is_last_attempt:
+                    logger.warning(
+                        "Rate limited on '%s' (attempt %d/%d), "
+                        "waiting %ds before retry...",
+                        item.title, attempt + 1, self._MAX_RETRIES, self._RETRY_BACKOFF,
+                    )
+                    time.sleep(self._RETRY_BACKOFF)
+                    continue
+
+                logger.warning("Error summarizing %s: %s", item.title, e)
+                return {
+                    **item.to_dict(),
+                    "summary": item.description[:50] + "..." if item.description else item.title,
+                    "category": "其他",
+                    "importance": 5,
+                }
+
+        # Should not reach here, but satisfy type checker
+        return {**item.to_dict(), "summary": item.title, "category": "其他", "importance": 5}
+
+    def _wait_for_rate_limit(self) -> None:
+        """Sleep if needed to respect the configured requests-per-minute limit."""
+        now = time.monotonic()
+        elapsed = now - self._last_call_ts
+        if elapsed < self._request_interval:
+            sleep_for = self._request_interval - elapsed
+            logger.debug("Rate limit: sleeping %.1fs before next API call", sleep_for)
+            time.sleep(sleep_for)
+        self._last_call_ts = time.monotonic()
+
+    def _call_api(self, prompt: str) -> str:
+        """Make a single Gemini API call and return the response text."""
+        if self.backend == "google-genai":
+            response = self.client.models.generate_content(
+                model=self.model_id, contents=prompt
+            )
+        else:
+            response = self.model.generate_content(prompt)
+        return response.text
 
     def batch_summarize(
         self,
