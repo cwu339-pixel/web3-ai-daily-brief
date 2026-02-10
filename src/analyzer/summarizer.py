@@ -54,14 +54,15 @@ class Summarizer:
                 "Set it in .env file or environment variable."
                 )
 
-        self.model_id = "gemini-2.5-flash"
+        # gemini-2.5-flash-lite: 15 RPM free tier (vs 5 RPM for 2.5-flash)
+        self.model_id = "gemini-2.5-flash-lite"
         self.backend = _GENAI_BACKEND
 
         # Rate-limit state: track when the last API call was made
         self._last_call_ts: float = 0.0
 
-        # Allow paid-tier users to raise the RPM via env var
-        rpm = int(os.getenv("GEMINI_RPM", str(self._DEFAULT_FREE_TIER_RPM)))
+        # flash-lite free tier is 15 RPM; allow override via GEMINI_RPM env var
+        rpm = int(os.getenv("GEMINI_RPM", "15"))
         self._request_interval = 60.0 / max(rpm, 1)
 
         if self.backend == "google-genai":
