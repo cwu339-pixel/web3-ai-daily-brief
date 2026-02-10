@@ -38,7 +38,7 @@ def main():
   %(prog)s generate --sources coindesk       只用 CoinDesk 新闻
   %(prog)s generate --sources reddit hn      只用 Reddit + HN
   %(prog)s generate --ai-only               只生成 AI 简报
-  %(prog)s generate --max 10                 每源最多处理 10 条
+  %(prog)s generate --max 5                  每源最多处理 5 条
         """,
     )
 
@@ -59,7 +59,10 @@ def main():
         "--web3-only", action="store_true", help="只爬取 Web3 项目"
     )
     parser.add_argument(
-        "--max", type=int, default=10, help="每类最多处理的项目数（默认 10）"
+        "--max", type=int, default=10, help="分析总条数上限（默认 10）"
+    )
+    parser.add_argument(
+        "--per-source", type=int, default=2, help="每个数据源最多取几条（默认 2）"
     )
     parser.add_argument(
         "--output-dir", default="outputs", help="输出目录（默认 outputs）"
@@ -95,10 +98,13 @@ def generate_briefing(args):
         print("没有找到相关项目或新闻")
         return
 
+    # Pick up to args.per_source items from each source, total capped at args.max
+    selected = _select_per_source(all_items, per_source=args.per_source, total=args.max)
+
     print()
-    print(f"正在使用 Gemini API 分析 {len(all_items)} 条内容...")
+    print(f"正在使用 Gemini API 分析 {len(selected)} 条内容（共抓取 {len(all_items)} 条）...")
     summarizer = Summarizer()
-    analyzed = summarizer.batch_summarize(all_items, max_items=args.max)
+    analyzed = summarizer.batch_summarize(selected, max_items=len(selected))
     print(f"   完成 {len(analyzed)} 条内容分析")
     print()
 
@@ -196,6 +202,21 @@ def _scrape_rss(name, scraper):
         logger.warning("Failed to fetch %s: %s", name, e)
         print(f"   {name} 爬取失败，跳过")
         return []
+
+
+def _select_per_source(items, per_source: int = 2, total: int = 10):
+    """Pick up to `per_source` items from each source, capped at `total`."""
+    from src.models.content_item import ContentItem
+    counts: dict = {}
+    selected = []
+    for item in items:
+        src = item.source.value if isinstance(item, ContentItem) else item.get("source", "unknown")
+        if counts.get(src, 0) < per_source:
+            selected.append(item)
+            counts[src] = counts.get(src, 0) + 1
+        if len(selected) >= total:
+            break
+    return selected
 
 
 def _deduplicate(items):

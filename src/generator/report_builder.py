@@ -280,7 +280,7 @@ class ReportBuilder:
             "",
             "💡 **Focus Sectors**: Perp DEX | Stablecoin & Payment | RWA Tokenization | AI Infrastructure",
             "",
-            "*Automated Intelligence Report | Powered by [Tech-Crypto-Brief](https://github.com/yourusername/web3-ai-daily-brief)*",
+            "*Automated Intelligence Report | Powered by [Tech-Crypto-Brief](https://github.com/cwu339-pixel/web3-ai-daily-brief)*",
             "",
         ])
         return lines
