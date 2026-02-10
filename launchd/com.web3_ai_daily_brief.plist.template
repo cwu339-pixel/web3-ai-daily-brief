@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.web3_ai_daily_brief</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/zsh</string>
+      <string>-lc</string>
+      <string>cd "__REPO_PATH__" &amp;&amp; chmod +x ./scripts/run_daily_brief.sh &amp;&amp; ./scripts/run_daily_brief.sh</string>
+    </array>
+
+    <!-- Local time (user session). Default: 09:00. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>9</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_PATH__/outputs/launchd_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_PATH__/outputs/launchd_stderr.log</string>
+  </dict>
+</plist>

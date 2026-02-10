@@ -1,155 +1,176 @@
 """GitHub Trending scraper"""
+import logging
+import re
+from typing import List, Optional
+
 import requests
 from bs4 import BeautifulSoup
-from typing import List, Dict, Optional
-import re
+
+from src.models.content_item import ContentItem, SourceType
+from src.scrapers.base_scraper import BaseScraper
+
+logger = logging.getLogger(__name__)
 
 
-class GitHubScraper:
-    """爬取 GitHub Trending 页面"""
+# Investment-focused keywords (Summer Capital priority sectors)
+AI_KEYWORDS = [
+    "AI", "artificial intelligence", "machine learning", "ML",
+    "deep learning", "neural", "LLM", "GPT", "transformer",
+    "agent", "autonomous agent", "reasoning", "o1", "o3",
+    "Claude", "OpenAI", "Anthropic", "AGI", "multimodal",
+]
 
-    def __init__(self):
-        self.base_url = "https://github.com/trending"
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-        }
+WEB3_KEYWORDS = [
+    # Core infrastructure
+    "blockchain", "web3", "crypto", "ethereum", "solidity",
+    "smart contract", "L1", "L2", "layer 2", "rollup",
+    "solana", "polygon", "avalanche", "bitcoin", "wallet",
 
-    def fetch_trending(
-        self, language: Optional[str] = None, since: str = "daily"
-    ) -> List[Dict[str, str]]:
-        """
-        获取 GitHub Trending 项目
+    # Priority sectors (Joey mentioned)
+    "perpetual", "perp", "DEX", "decentralized exchange",
+    "stablecoin", "stable coin", "USDC", "USDT", "payment",
+    "RWA", "real world asset", "tokenization", "tokenized",
+
+    # DeFi & Trading
+    "DeFi", "AMM", "liquidity", "yield", "staking",
+    "trading terminal", "derivatives", "options",
+
+    # Ecosystem
+    "DAO", "dApp", "NFT", "oracle", "bridge",
+]
+
+
+class GitHubScraper(BaseScraper):
+    """Scrape GitHub Trending page and return ContentItem list."""
+
+    BASE_URL = "https://github.com/trending"
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36"
+        )
+    }
+
+    def source_name(self) -> str:
+        return "GitHub Trending"
+
+    def fetch(
+        self,
+        language: Optional[str] = None,
+        since: str = "daily",
+        **kwargs,
+    ) -> List[ContentItem]:
+        """Fetch trending projects from GitHub.
 
         Args:
-            language: 编程语言过滤（如 "python", "javascript"）
-            since: 时间范围 ("daily", "weekly", "monthly")
+            language: Filter by programming language (e.g. "python").
+            since: Time range ("daily", "weekly", "monthly").
 
         Returns:
-            项目列表，每个项目包含：repo_name, description, url, stars, language
+            List of ContentItem with source=GITHUB.
         """
-        url = self.base_url
+        url = (
+            f"{self.BASE_URL}/{language}" if language else self.BASE_URL
+        )
         params = {"since": since}
 
-        if language:
-            url = f"{self.base_url}/{language}"
-
         try:
-            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            response = requests.get(
+                url, headers=self.HEADERS, params=params, timeout=10
+            )
             response.raise_for_status()
         except requests.RequestException as e:
-            print(f"❌ Error fetching GitHub Trending: {e}")
+            logger.error("Failed to fetch GitHub Trending: %s", e)
             return []
 
         return self._parse_trending_page(response.text)
 
-    def _parse_trending_page(self, html: str) -> List[Dict[str, str]]:
-        """解析 trending 页面 HTML"""
+    # Backward-compatible API (v1) returning list[dict].
+    # Some scripts/tests used `fetch_trending()` with legacy field names.
+    def fetch_trending(
+        self,
+        language: Optional[str] = None,
+        since: str = "daily",
+    ) -> List[dict]:
+        items = self.fetch(language=language, since=since)
+        return [
+            {
+                "repo_name": item.title,
+                "description": item.description,
+                "url": item.url,
+                "stars": item.engagement,
+                "language": item.content_type,
+            }
+            for item in items
+        ]
+
+    def _parse_trending_page(self, html: str) -> List[ContentItem]:
+        """Parse trending page HTML into ContentItem list."""
         soup = BeautifulSoup(html, "html.parser")
-        projects = []
+        items = []
 
-        # 找到所有 trending 项目
-        articles = soup.find_all("article", class_="Box-row")
-
-        for article in articles:
+        for article in soup.find_all("article", class_="Box-row"):
             try:
-                # 项目名称和链接
-                h2 = article.find("h2", class_="h3")
-                if not h2:
-                    continue
-
-                repo_link = h2.find("a")
-                if not repo_link:
-                    continue
-
-                repo_name = repo_link.get("href", "").strip("/")
-                repo_url = f"https://github.com{repo_link.get('href', '')}"
-
-                # 描述
-                description_elem = article.find("p", class_="col-9")
-                description = (
-                    description_elem.get_text(strip=True) if description_elem else ""
-                )
-
-                # 编程语言
-                language_elem = article.find("span", attrs={"itemprop": "programmingLanguage"})
-                language = language_elem.get_text(strip=True) if language_elem else "Unknown"
-
-                # 今日 stars
-                stars_elem = article.find("span", class_="d-inline-block float-sm-right")
-                stars_text = stars_elem.get_text(strip=True) if stars_elem else "0"
-                # 提取数字（例如 "1,234 stars today" -> "1234"）
-                stars = re.sub(r"[^\d]", "", stars_text.split("today")[0]) if "today" in stars_text else "0"
-
-                projects.append(
-                    {
-                        "repo_name": repo_name,
-                        "description": description,
-                        "url": repo_url,
-                        "stars": stars,
-                        "language": language,
-                    }
-                )
-
+                item = self._parse_single_article(article)
+                if item is not None:
+                    items.append(item)
             except Exception as e:
-                print(f"⚠️  Warning: Failed to parse project: {e}")
-                continue
+                logger.warning("Failed to parse project: %s", e)
 
-        return projects
+        return items
 
-    def filter_by_keywords(
-        self, projects: List[Dict[str, str]], keywords: List[str]
-    ) -> List[Dict[str, str]]:
-        """
-        根据关键词过滤项目
+    def _parse_single_article(self, article) -> Optional[ContentItem]:
+        """Parse a single <article> element. Returns None on failure."""
+        h2 = article.find("h2", class_="h3")
+        if not h2:
+            return None
 
-        Args:
-            projects: 项目列表
-            keywords: 关键词列表（不区分大小写）
+        repo_link = h2.find("a")
+        if not repo_link:
+            return None
 
-        Returns:
-            过滤后的项目列表
-        """
-        if not projects:
-            return []
+        repo_name = repo_link.get("href", "").strip("/")
+        repo_url = f"https://github.com{repo_link.get('href', '')}"
 
-        filtered = []
-        keywords_lower = [kw.lower() for kw in keywords]
+        desc_elem = article.find("p", class_="col-9")
+        description = desc_elem.get_text(strip=True) if desc_elem else ""
 
-        for project in projects:
-            # 在项目名称和描述中搜索关键词
-            text = f"{project['repo_name']} {project['description']}".lower()
+        lang_elem = article.find(
+            "span", attrs={"itemprop": "programmingLanguage"}
+        )
+        language = lang_elem.get_text(strip=True) if lang_elem else "Unknown"
 
-            if any(keyword in text for keyword in keywords_lower):
-                filtered.append(project)
+        stars_elem = article.find(
+            "span", class_="d-inline-block float-sm-right"
+        )
+        stars_text = (
+            stars_elem.get_text(strip=True) if stars_elem else "0"
+        )
+        stars = (
+            re.sub(r"[^\d]", "", stars_text.split("today")[0])
+            if "today" in stars_text
+            else "0"
+        )
 
-        return filtered
+        return ContentItem(
+            title=repo_name,
+            description=description,
+            url=repo_url,
+            source=SourceType.GITHUB,
+            engagement=stars,
+            content_type=language,
+        )
 
 
-# 便捷函数
-def get_ai_trending() -> List[Dict[str, str]]:
-    """获取 AI 相关的 trending 项目"""
+def get_ai_trending() -> List[ContentItem]:
+    """Convenience: fetch AI-related trending projects."""
     scraper = GitHubScraper()
-    all_projects = scraper.fetch_trending(since="daily")
-
-    ai_keywords = [
-        "AI", "artificial intelligence", "machine learning", "ML",
-        "deep learning", "neural", "LLM", "GPT", "transformer",
-        "diffusion", "stable diffusion", "computer vision", "NLP",
-        "Claude", "OpenAI", "Anthropic"
-    ]
-
-    return scraper.filter_by_keywords(all_projects, ai_keywords)
+    all_projects = scraper.fetch(since="daily")
+    return scraper.filter_by_keywords(all_projects, AI_KEYWORDS)
 
 
-def get_web3_trending() -> List[Dict[str, str]]:
-    """获取 Web3 相关的 trending 项目"""
+def get_web3_trending() -> List[ContentItem]:
+    """Convenience: fetch Web3-related trending projects."""
     scraper = GitHubScraper()
-    all_projects = scraper.fetch_trending(since="daily")
-
-    web3_keywords = [
-        "blockchain", "web3", "crypto", "ethereum", "solidity",
-        "smart contract", "DeFi", "NFT", "DAO", "dApp",
-        "solana", "polygon", "avalanche", "bitcoin", "wallet"
-    ]
-
-    return scraper.filter_by_keywords(all_projects, web3_keywords)
+    all_projects = scraper.fetch(since="daily")
+    return scraper.filter_by_keywords(all_projects, WEB3_KEYWORDS)

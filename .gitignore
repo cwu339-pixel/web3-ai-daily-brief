@@ -28,3 +28,4 @@ htmlcov/
 outputs/*.md
 !outputs/.gitkeep
 *.log
+.DS_Store

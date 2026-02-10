@@ -1,135 +1,151 @@
-"""AI-powered summarizer using Gemini API"""
-import os
-from typing import List, Dict
-from google import genai
-from google.genai import types
+"""AI-powered summarizer using Gemini API.
+
+This project historically depended on `google-generativeai`, but the code was
+partially migrated to the newer `google-genai` SDK (import path: `from google import genai`).
+To avoid runtime failures, support both SDKs and pick whichever is installed.
+"""
 import json
+import logging
+import os
+from typing import Any, Dict, List, Union
+
+_GENAI_BACKEND = "unknown"
+try:
+    # New SDK: `pip install google-genai`
+    from google import genai as _genai  # type: ignore
+
+    _GENAI_BACKEND = "google-genai"
+except Exception:  # pragma: no cover
+    # Old SDK: `pip install google-generativeai`
+    import google.generativeai as _genai  # type: ignore
+
+    _GENAI_BACKEND = "google-generativeai"
+
+from src.analyzer.prompt_templates import build_prompt
+from src.models.content_item import ContentItem, SourceType
+
+logger = logging.getLogger(__name__)
 
 
 class Summarizer:
-    """使用 Gemini API 总结和分类内容"""
+    """Analyze content items using the Gemini API."""
 
     def __init__(self, api_key: str = None):
-        """
-        初始化 Summarizer
+        """Initialize Summarizer.
 
         Args:
-            api_key: Google Gemini API key（如果不提供，从环境变量读取）
+            api_key: Gemini API key. Falls back to GEMINI_API_KEY env var.
 
         Raises:
-            ValueError: 如果没有找到 API key
+            ValueError: If no API key is available.
         """
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
+        resolved_key = api_key or os.getenv("GEMINI_API_KEY")
+        if not resolved_key:
             raise ValueError(
                 "GEMINI_API_KEY not found. "
                 "Set it in .env file or environment variable."
-            )
+                )
 
-        self.client = genai.Client(api_key=self.api_key)
-        self.model_id = 'gemini-2.5-flash'
+        self.model_id = "gemini-2.5-flash"
+        self.backend = _GENAI_BACKEND
 
-    def summarize_project(self, project: Dict[str, str]) -> Dict[str, any]:
-        """
-        总结单个 GitHub 项目
+        if self.backend == "google-genai":
+            self.client = _genai.Client(api_key=resolved_key)
+            self.model = None
+        else:
+            # google-generativeai uses module-level configure + model instance.
+            _genai.configure(api_key=resolved_key)
+            self.client = None
+            self.model = _genai.GenerativeModel(self.model_id)
 
-        Args:
-            project: 项目信息字典，包含 repo_name, description, url 等
+    def summarize_item(
+        self, item: Union[ContentItem, Dict]
+    ) -> Dict[str, Any]:
+        """Summarize a single content item.
+
+        Accepts both ContentItem and legacy Dict format for backward
+        compatibility.
 
         Returns:
-            包含 summary, category, importance 的字典
+            Dict with original fields + summary, category, importance.
         """
-        prompt = f"""请分析以下 GitHub 项目：
+        if isinstance(item, dict):
+            return self._summarize_legacy_dict(item)
 
-项目名称：{project['repo_name']}
-描述：{project['description']}
-编程语言：{project.get('language', 'Unknown')}
-今日 Stars：{project.get('stars', '0')}
-
-请提供：
-1. 一句话总结（中文，<30 字）
-2. 分类（从以下选择一个）：AI技术/Web3技术/开发工具/其他
-3. 重要性评分（1-10，10 最重要）
-
-请严格按照以下 JSON 格式输出，不要有任何其他文字：
-{{
-  "summary": "项目的一句话总结",
-  "category": "分类名称",
-  "importance": 8
-}}"""
+        prompt = build_prompt(item)
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model_id,
-                contents=prompt
-            )
-            content = response.text.strip()
+            if self.backend == "google-genai":
+                response = self.client.models.generate_content(
+                    model=self.model_id, contents=prompt
+                )
+                text = response.text
+            else:
+                response = self.model.generate_content(prompt)
+                text = response.text
 
-            # 提取 JSON（Gemini 可能会在前后加 ```json）
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
-
-            result = json.loads(content)
-
-            # 添加原始项目信息
-            result.update(project)
-
-            return result
+            analysis = self._parse_json_response(text)
+            return {**item.to_dict(), **analysis}
 
         except Exception as e:
-            print(f"⚠️  Error summarizing {project['repo_name']}: {e}")
-            # 返回降级结果
+            logger.warning("Error summarizing %s: %s", item.title, e)
             return {
-                **project,
-                "summary": project["description"][:50] + "...",
+                **item.to_dict(),
+                "summary": item.description[:50] + "...",
                 "category": "其他",
                 "importance": 5,
             }
 
     def batch_summarize(
-        self, projects: List[Dict[str, str]], max_items: int = 20
-    ) -> List[Dict[str, any]]:
-        """
-        批量总结多个项目
-
-        Args:
-            projects: 项目列表
-            max_items: 最多处理的项目数
-
-        Returns:
-            总结后的项目列表
-        """
-        if not projects:
+        self,
+        items: Union[List[ContentItem], List[Dict]],
+        max_items: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Batch-summarize multiple items, sorted by importance desc."""
+        if not items:
             return []
 
-        results = []
-        for project in projects[:max_items]:
-            result = self.summarize_project(project)
-            results.append(result)
+        results = [
+            self.summarize_item(item) for item in items[:max_items]
+        ]
+        return sorted(
+            results, key=lambda x: x.get("importance", 0), reverse=True
+        )
 
-        # 按重要性排序
-        results.sort(key=lambda x: x.get("importance", 0), reverse=True)
+    # kept for backward compat with old code calling summarize_project
+    summarize_project = summarize_item
 
-        return results
-
-    def categorize_items(self, items: List[Dict]) -> Dict[str, List[Dict]]:
-        """
-        将项目按类别分组
-
-        Args:
-            items: 已总结的项目列表
-
-        Returns:
-            按类别分组的字典
-        """
-        categorized = {}
-
+    def categorize_items(
+        self, items: List[Dict]
+    ) -> Dict[str, List[Dict]]:
+        """Group analyzed items by category (immutable)."""
+        categorized: Dict[str, List[Dict]] = {}
         for item in items:
             category = item.get("category", "其他")
-            if category not in categorized:
-                categorized[category] = []
-            categorized[category].append(item)
-
+            categorized = {
+                **categorized,
+                category: [*categorized.get(category, []), item],
+            }
         return categorized
+
+    def _summarize_legacy_dict(self, project: Dict) -> Dict:
+        """Handle old Dict[str, str] format from GitHubScraper v1."""
+        item = ContentItem(
+            title=project.get("repo_name", project.get("title", "")),
+            description=project.get("description", ""),
+            url=project.get("url", ""),
+            source=SourceType.GITHUB,
+            engagement=project.get("stars"),
+            content_type=project.get("language"),
+        )
+        return self.summarize_item(item)
+
+    @staticmethod
+    def _parse_json_response(text: str) -> Dict:
+        """Extract JSON from Gemini response (may be wrapped in ```json)."""
+        content = text.strip()
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        return json.loads(content)
