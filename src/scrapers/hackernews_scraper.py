@@ -1,5 +1,6 @@
 """Hacker News scraper via Algolia HN Search API (no auth required)"""
 import logging
+import time
 from typing import List
 
 import requests
@@ -95,10 +96,11 @@ class HackerNewsScraper(BaseScraper):
 
     def _search_keyword(self, keyword: str) -> List[dict]:
         """Query Algolia for one keyword; return raw hit dicts."""
+        since_ts = int(time.time()) - self._hours_back * 3600
         params = {
             "query": keyword,
             "tags": "story",
-            "numericFilters": f"points>={self._min_points}",
+            "numericFilters": f"points>={self._min_points},created_at_i>{since_ts}",
             "hitsPerPage": 20,
         }
 
