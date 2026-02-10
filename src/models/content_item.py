@@ -8,6 +8,8 @@ class SourceType(Enum):
     GITHUB = "github"
     COINDESK = "coindesk"
     COINTELEGRAPH = "cointelegraph"
+    REDDIT = "reddit"
+    HACKERNEWS = "hackernews"
 
 
 @dataclass(frozen=True)
