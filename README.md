@@ -5,11 +5,14 @@
 ## ✨ 功能特性
 
 - 🤖 自动爬取 GitHub Trending（AI + Web3 项目）
+- 📰 抓取 CoinDesk / CoinTelegraph 最新 Web3 新闻
+- 💬 聚合 Reddit r/MachineLearning 热门讨论
+- 🔥 获取 Hacker News AI 相关高分故事
 - 🧠 使用 Google Gemini AI 智能总结和分类
 - 📝 生成精美的 Markdown 格式简报
 - ⭐ 自动评估项目重要性（1-10 分）
 - 🏷️ 智能分类（AI技术/Web3技术/开发工具/其他）
-- ⏰ 支持定时自动运行
+- ⏰ 支持定时自动运行（launchd）
 
 ## 📸 效果预览
 
@@ -32,7 +35,7 @@
 ### 1. 安装
 
 ```bash
-git clone https://github.com/yourusername/web3-ai-daily-brief.git
+git clone https://github.com/cwu339-pixel/web3-ai-daily-brief.git
 cd web3-ai-daily-brief
 
 # 创建虚拟环境
@@ -80,20 +83,33 @@ cat outputs/$(date +%Y-%m-%d)-briefing.md
 ```
 web3-ai-daily-brief/
 ├── src/
-│   ├── scrapers/           # 数据爬取模块
-│   │   └── github_scraper.py   # GitHub Trending 爬虫
-│   ├── analyzer/           # AI 分析模块
-│   │   └── summarizer.py       # Gemini API 总结器
-│   ├── generator/          # 报告生成模块
-│   │   └── report_builder.py   # Markdown 报告生成
-│   └── cli.py              # 命令行工具
-├── tests/                  # 测试文件
-│   ├── test_github_scraper.py
-│   └── test_summarizer.py
-├── outputs/                # 生成的简报
+│   ├── scrapers/                    # 数据爬取模块
+│   │   ├── base_scraper.py          # 抽象基类
+│   │   ├── github_scraper.py        # GitHub Trending 爬虫
+│   │   ├── coindesk_scraper.py      # CoinDesk RSS 新闻
+│   │   ├── cointelegraph_scraper.py # CoinTelegraph RSS 新闻
+│   │   ├── reddit_scraper.py        # Reddit 子版块爬虫
+│   │   ├── hackernews_scraper.py    # Hacker News AI 故事
+│   │   ├── rss_scraper.py           # RSS 通用基类
+│   │   └── market_scraper.py        # 市场数据
+│   ├── analyzer/                    # AI 分析模块
+│   │   ├── summarizer.py            # Gemini API 总结器
+│   │   └── prompt_templates.py      # Prompt 模板
+│   ├── generator/                   # 报告生成模块
+│   │   └── report_builder.py        # Markdown 报告生成
+│   ├── models/                      # 数据模型
+│   │   └── content_item.py          # 统一内容模型
+│   └── cli.py                       # 命令行工具
+├── scripts/                         # 运行脚本
+│   ├── run_daily_brief.sh           # 每日执行脚本
+│   ├── install_launchd.sh           # macOS 定时任务安装
+│   └── uninstall_launchd.sh         # 定时任务卸载
+├── launchd/                         # macOS launchd 配置
+├── tests/                           # 测试文件
+├── outputs/                         # 生成的简报
 │   └── YYYY-MM-DD-briefing.md
-├── examples/               # 示例脚本
-└── .env                    # 配置文件（需自己创建）
+├── examples/                        # 示例脚本
+└── .env                             # 配置文件（需自己创建）
 ```
 
 ## 🎯 使用场景
@@ -135,9 +151,15 @@ flake8 src/ tests/
 - [x] CLI 工具
 - [x] 端到端测试
 
-### 🔜 下一步计划（v0.2.0）
-- [ ] 增加更多信息源（CoinDesk, CoinTelegraph）
-- [ ] Reddit r/MachineLearning 爬虫
+### ✅ v0.2.0 已完成
+- [x] CoinDesk RSS 新闻爬虫
+- [x] CoinTelegraph RSS 新闻爬虫
+- [x] Reddit r/MachineLearning 爬虫
+- [x] Hacker News AI 故事爬虫
+- [x] 统一内容模型（ContentItem）
+- [x] macOS launchd 定时自动运行
+
+### 🔜 下一步计划（v0.3.0）
 - [ ] 邮件推送功能
 - [ ] GitHub Actions 自动运行
 - [ ] Web UI 界面
@@ -153,20 +175,19 @@ flake8 src/ tests/
 
 - **语言**：Python 3.8+
 - **AI**：Google Gemini 2.5 Flash
-- **爬虫**：requests + BeautifulSoup
+- **爬虫**：requests + BeautifulSoup + feedparser
 - **测试**：pytest
 - **格式化**：black + flake8
 
 ## 📊 数据来源
 
-目前支持：
-- ✅ GitHub Trending（AI + Web3 项目）
-
-计划支持：
-- 🔜 CoinDesk（Web3 新闻）
-- 🔜 CoinTelegraph（Web3 新闻）
-- 🔜 Reddit r/MachineLearning
-- 🔜 Hacker News（AI 标签）
+| 来源 | 类型 | 状态 |
+|------|------|------|
+| GitHub Trending | AI + Web3 开源项目 | ✅ 已支持 |
+| CoinDesk | Web3 新闻（RSS） | ✅ 已支持 |
+| CoinTelegraph | Web3 新闻（RSS） | ✅ 已支持 |
+| Reddit r/MachineLearning | AI 社区讨论 | ✅ 已支持 |
+| Hacker News | AI 高分故事 | ✅ 已支持 |
 
 ## 🤝 贡献
 
@@ -187,13 +208,16 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 - [GitHub Trending](https://github.com/trending) - 项目数据来源
 - [Google Gemini](https://ai.google.dev/) - AI 分析能力
+- [CoinDesk](https://www.coindesk.com) / [CoinTelegraph](https://cointelegraph.com) - Web3 新闻
+- [Reddit r/MachineLearning](https://www.reddit.com/r/MachineLearning/) - AI 社区讨论
+- [Hacker News](https://news.ycombinator.com) - 技术社区故事
 - [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) - HTML 解析
+- [feedparser](https://feedparser.readthedocs.io/) - RSS 解析
 
 ## 📧 联系方式
 
 有问题或建议？欢迎：
-- 提交 [Issue](https://github.com/yourusername/web3-ai-daily-brief/issues)
-- 发送邮件到：your.email@example.com
+- 提交 [Issue](https://github.com/cwu339-pixel/web3-ai-daily-brief/issues)
 
 ---
 
