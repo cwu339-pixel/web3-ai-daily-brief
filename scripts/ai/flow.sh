@@ -24,13 +24,37 @@ notes="${3:-}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 handoff="${script_dir}/handoff.sh"
 gate="${script_dir}/gate.sh"
+task_file=".ai/tasks/${task_id}.json"
+
+read_mode() {
+  if [[ -f "$task_file" ]]; then
+    local m
+    m="$(jq -r '.mode // "triple"' "$task_file" 2>/dev/null || echo triple)"
+    case "$m" in
+      single|dual|triple) echo "$m" ;;
+      *) echo "triple" ;;
+    esac
+  else
+    echo "triple"
+  fi
+}
+
+mode="$(read_mode)"
 
 case "$action" in
   impl)
-    "$handoff" "$task_id" impl impl_done review "$notes"
+    if [[ "$mode" == "single" ]]; then
+      "$handoff" "$task_id" impl impl_done approved "$notes"
+    else
+      "$handoff" "$task_id" impl impl_done review "$notes"
+    fi
     ;;
   review_pass)
-    "$handoff" "$task_id" review review_pass break_test "$notes"
+    if [[ "$mode" == "triple" ]]; then
+      "$handoff" "$task_id" review review_pass break_test "$notes"
+    else
+      "$handoff" "$task_id" review review_pass approved "$notes"
+    fi
     ;;
   review_fail)
     "$handoff" "$task_id" review review_fail impl_fix "$notes"

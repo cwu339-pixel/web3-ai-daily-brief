@@ -34,6 +34,7 @@ EOF
     cat <<EOF
 任务 ${task_id}（模式: ${mode}）：
 你只做代码审查，不允许改代码。
+输出第一行必须是 REVIEW_PASS 或 REVIEW_FAIL。
 只报告 P1/P2 问题，格式：问题 -> 复现步骤 -> 影响 -> 修复建议。
 EOF
     ;;

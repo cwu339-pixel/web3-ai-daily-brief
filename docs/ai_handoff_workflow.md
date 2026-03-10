@@ -1,6 +1,7 @@
 # AI Local Handoff Workflow
 
 This workflow keeps implementation, review, and break-test separated with explicit JSON handoffs.
+If you only want two tools, use: Codex for implementation + OpenClaw for review.
 
 ## 1) Prepare once
 
@@ -41,6 +42,32 @@ Need role prompt text quickly:
 ./scripts/ai/prompt.sh T124 impl
 ./scripts/ai/prompt.sh T124 review
 ./scripts/ai/prompt.sh T124 break_test
+```
+
+## 1.7) Two-tool mode (Codex + OpenClaw)
+
+Recommended:
+
+```bash
+./scripts/ai/start.sh T200 medium main
+```
+
+Codex implements and marks done:
+
+```bash
+./scripts/ai/flow.sh T200 impl "impl done"
+```
+
+OpenClaw reviews and writes verdict automatically:
+
+```bash
+OPENCLAW_AGENT=main ./scripts/ai/openclaw_review.sh T200
+```
+
+Check final state:
+
+```bash
+./scripts/ai/flow.sh T200 status
 ```
 
 ## 2) Create isolated worktree for a task
