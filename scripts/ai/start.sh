@@ -80,9 +80,10 @@ echo
 echo "next steps:"
 echo "1) AI 实现: ./scripts/ai/flow.sh ${task_id} impl \"impl done\""
 if [[ "$mode" == "dual" || "$mode" == "triple" ]]; then
-  echo "2) AI 审查: ./scripts/ai/flow.sh ${task_id} review_pass \"review pass\""
+  echo "2) OpenClaw 审查: OPENCLAW_AGENT=main ./scripts/ai/openclaw_review.sh ${task_id}"
 fi
 if [[ "$mode" == "triple" ]]; then
   echo "3) AI 破坏测试: ./scripts/ai/flow.sh ${task_id} break_pass \"break pass\""
 fi
 echo "4) 查询状态: ./scripts/ai/flow.sh ${task_id} status"
+echo "5) 自动下一步: ./scripts/ai/next.sh ${task_id} [--run]"

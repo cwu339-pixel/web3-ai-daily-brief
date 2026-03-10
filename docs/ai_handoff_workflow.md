@@ -64,10 +64,19 @@ OpenClaw reviews and writes verdict automatically:
 OPENCLAW_AGENT=main ./scripts/ai/openclaw_review.sh T200
 ```
 
+Note: if no diff context is detected, review is auto-marked as fail (`impl_fix`).
+
 Check final state:
 
 ```bash
 ./scripts/ai/flow.sh T200 status
+```
+
+Or let the helper decide the next action:
+
+```bash
+./scripts/ai/next.sh T200
+./scripts/ai/next.sh T200 --run   # auto-run OpenClaw when NEXT=review
 ```
 
 ## 2) Create isolated worktree for a task
