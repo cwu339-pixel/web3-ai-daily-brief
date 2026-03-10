@@ -13,7 +13,7 @@ source venv/bin/activate
 
 # 3. 确保 .env 配置正确
 cat .env
-# 应该看到：GEMINI_API_KEY=AIzaSy...
+# 应该看到：OPENAI_API_KEY=sk-...
 
 # 4. 生成第一份简报
 python -m src.cli generate --max 3
@@ -93,7 +93,7 @@ jobs:
 
       - name: Generate brief
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python -m src.cli generate
 
       - name: Commit report
@@ -142,7 +142,7 @@ web3_keywords = [
 cat outputs/2026-02-05-briefing.md
 
 # 搜索包含特定关键词的简报
-grep -r "Claude" outputs/
+grep -r "OpenAI" outputs/
 
 # 统计简报数量
 ls -1 outputs/*.md | wc -l
@@ -158,9 +158,10 @@ cat .env
 
 # 测试 API key
 python << EOF
-from google import genai
-client = genai.Client(api_key="你的key")
-print("API key 有效！")
+from openai import OpenAI
+client = OpenAI(api_key="你的key")
+models = client.models.list()
+print(f"API key 有效！可见模型数: {len(models.data)}")
 EOF
 ```
 
@@ -174,14 +175,14 @@ python -m src.cli generate
 curl -I https://github.com/trending
 ```
 
-### 问题 3：Gemini API 配额用完
+### 问题 3：OpenAI API 配额用完
 
 ```bash
 # 减少每次处理的项目数
 python -m src.cli generate --max 3
 
 # 或者升级 API plan
-# 访问 https://aistudio.google.com/
+# 访问 https://platform.openai.com/usage
 ```
 
 ## 💡 最佳实践
@@ -235,7 +236,7 @@ grep -h "GitHub Trending" outputs/*.md | \
 
 ## 🎓 学习资源
 
-- [Gemini API 文档](https://ai.google.dev/docs)
+- [OpenAI API 文档](https://platform.openai.com/docs/overview)
 - [BeautifulSoup 教程](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
 - [GitHub Trending 算法](https://github.com/trending)
 

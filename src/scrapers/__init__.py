@@ -1,10 +1,11 @@
-"""Scrapers package"""
-from src.scrapers.github_scraper import GitHubScraper
-from src.scrapers.coindesk_scraper import CoinDeskScraper
-from src.scrapers.cointelegraph_scraper import CoinTelegraphScraper
-from src.scrapers.reddit_scraper import RedditScraper
-from src.scrapers.hackernews_scraper import HackerNewsScraper
-from src.scrapers.market_scraper import MarketScraper
+"""Scrapers package with lazy imports.
+
+Avoid importing optional heavy dependencies (RSS, Telegram, etc.) at package
+import time. This keeps lightweight modules usable even when extras are absent.
+"""
+
+from importlib import import_module
+from typing import Dict
 
 __all__ = [
     "GitHubScraper",
@@ -14,3 +15,22 @@ __all__ = [
     "HackerNewsScraper",
     "MarketScraper",
 ]
+
+_MODULE_BY_CLASS: Dict[str, str] = {
+    "GitHubScraper": "src.scrapers.github_scraper",
+    "CoinDeskScraper": "src.scrapers.coindesk_scraper",
+    "CoinTelegraphScraper": "src.scrapers.cointelegraph_scraper",
+    "RedditScraper": "src.scrapers.reddit_scraper",
+    "HackerNewsScraper": "src.scrapers.hackernews_scraper",
+    "MarketScraper": "src.scrapers.market_scraper",
+}
+
+
+def __getattr__(name: str):
+    module_path = _MODULE_BY_CLASS.get(name)
+    if not module_path:
+        raise AttributeError(f"module 'src.scrapers' has no attribute '{name}'")
+    module = import_module(module_path)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value

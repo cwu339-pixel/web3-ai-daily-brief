@@ -15,6 +15,11 @@ from src.scrapers.coindesk_scraper import CoinDeskScraper
 from src.scrapers.cointelegraph_scraper import CoinTelegraphScraper
 from src.scrapers.hackernews_scraper import HackerNewsScraper
 from src.scrapers.reddit_scraper import RedditScraper
+from src.scrapers.openai_blog_scraper import OpenAIBlogScraper
+from src.scrapers.deepmind_blog_scraper import DeepMindBlogScraper
+from src.scrapers.theblock_scraper import TheBlockScraper
+from src.scrapers.blockworks_scraper import BlockworksScraper
+from src.scrapers.defillama_scraper import DefiLlamaScraper
 from src.scrapers.github_scraper import (
     AI_KEYWORDS,
     WEB3_KEYWORDS,
@@ -23,7 +28,20 @@ from src.scrapers.github_scraper import (
 
 logger = logging.getLogger(__name__)
 
-AVAILABLE_SOURCES = ("github", "coindesk", "cointelegraph", "reddit", "hackernews")
+AVAILABLE_SOURCES = (
+    "github",
+    "coindesk",
+    "cointelegraph",
+    "reddit",
+    "hackernews",
+    "openai_blog",
+    "deepmind_blog",
+    "bilibili",
+    "theblock",
+    "blockworks",
+    "telegram",
+    "defillama",
+)
 
 
 def main():
@@ -36,7 +54,7 @@ def main():
   %(prog)s generate                          生成今日简报（全部数据源）
   %(prog)s generate --sources github         只用 GitHub Trending
   %(prog)s generate --sources coindesk       只用 CoinDesk 新闻
-  %(prog)s generate --sources reddit hn      只用 Reddit + HN
+  %(prog)s generate --sources reddit hackernews  只用 Reddit + HN
   %(prog)s generate --ai-only               只生成 AI 简报
   %(prog)s generate --max 5                  每源最多处理 5 条
         """,
@@ -59,13 +77,19 @@ def main():
         "--web3-only", action="store_true", help="只爬取 Web3 项目"
     )
     parser.add_argument(
-        "--max", type=int, default=10, help="分析总条数上限（默认 10）"
+        "--max", type=int, default=5, help="分析总条数上限（默认 5）"
     )
     parser.add_argument(
-        "--per-source", type=int, default=2, help="每个数据源最多取几条（默认 2）"
+        "--per-source", type=int, default=1, help="每个数据源最多取几条（默认 1）"
     )
     parser.add_argument(
         "--output-dir", default="outputs", help="输出目录（默认 outputs）"
+    )
+    parser.add_argument(
+        "--bilibili-urls",
+        nargs="+",
+        default=[],
+        help="要分析的B站视频URL列表",
     )
 
     args = parser.parse_args()
@@ -81,8 +105,8 @@ def generate_briefing(args):
     print("=" * 60)
     print()
 
-    if not os.getenv("GEMINI_API_KEY"):
-        print("错误：未找到 GEMINI_API_KEY")
+    if not os.getenv("OPENAI_API_KEY"):
+        print("错误：未找到 OPENAI_API_KEY")
         print("请在 .env 文件中配置 API key")
         return
 
@@ -102,7 +126,7 @@ def generate_briefing(args):
     selected = _select_per_source(all_items, per_source=args.per_source, total=args.max)
 
     print()
-    print(f"正在使用 Gemini API 分析 {len(selected)} 条内容（共抓取 {len(all_items)} 条）...")
+    print(f"正在使用 OpenAI API 分析 {len(selected)} 条内容（共抓取 {len(all_items)} 条）...")
     summarizer = Summarizer()
     analyzed = summarizer.batch_summarize(selected, max_items=len(selected))
     print(f"   完成 {len(analyzed)} 条内容分析")
@@ -114,7 +138,11 @@ def generate_briefing(args):
     print(f"   简报已生成：{filepath}")
     print()
 
-    _print_stats(analyzed, filepath)
+    queue_path = builder.generate_social_queue(items=analyzed, max_posts=args.max)
+    print(f"   社媒队列已生成：{queue_path}")
+    print()
+
+    _print_stats(analyzed, filepath, queue_path)
 
 
 def _scrape_all_sources(sources, args):
@@ -130,6 +158,27 @@ def _scrape_all_sources(sources, args):
     if "cointelegraph" in sources:
         all_items.extend(_scrape_rss("CoinTelegraph", CoinTelegraphScraper()))
 
+    if "openai_blog" in sources:
+        all_items.extend(_scrape_rss("OpenAI Blog", OpenAIBlogScraper()))
+
+    if "deepmind_blog" in sources:
+        all_items.extend(_scrape_rss("DeepMind Blog", DeepMindBlogScraper()))
+        
+    if "theblock" in sources:
+        all_items.extend(_scrape_rss("The Block", TheBlockScraper()))
+
+    if "blockworks" in sources:
+        all_items.extend(_scrape_rss("Blockworks", BlockworksScraper()))
+
+    if "telegram" in sources:
+        all_items.extend(_scrape_telegram())
+        
+    if "defillama" in sources:
+        all_items.extend(_scrape_defillama())
+        
+    if "bilibili" in sources:
+        all_items.extend(_scrape_bilibili(args))
+
     if "reddit" in sources:
         all_items.extend(_scrape_reddit())
 
@@ -137,6 +186,28 @@ def _scrape_all_sources(sources, args):
         all_items.extend(_scrape_hackernews())
 
     return all_items
+
+
+def _scrape_bilibili(args):
+    """Scrape Bilibili videos from URLs."""
+    if not args.bilibili_urls:
+        return []
+    
+    print("正在爬取 Bilibili 视频文本...")
+    try:
+        from src.scrapers.bilibili_scraper import BilibiliScraper
+        scraper = BilibiliScraper()
+        items = scraper.fetch(video_urls=args.bilibili_urls, max_items=len(args.bilibili_urls))
+        print(f"   找到 {len(items)} 个 Bilibili 视频的文本")
+        return items
+    except ImportError as e:
+        logger.warning("Bilibili dependencies are missing: %s", e)
+        print("   Bilibili 依赖缺失，跳过")
+        return []
+    except Exception as e:
+        logger.warning("Failed to fetch Bilibili videos: %s", e)
+        print("   Bilibili 爬取失败，跳过")
+        return []
 
 
 def _scrape_reddit():
@@ -204,6 +275,38 @@ def _scrape_rss(name, scraper):
         return []
 
 
+def _scrape_telegram():
+    """Scrape Telegram channels."""
+    print("正在爬取 Telegram 频道 (Telethon)...")
+    try:
+        from src.scrapers.telegram_scraper import TelegramScraper
+        scraper = TelegramScraper()
+        items = scraper.fetch(max_items=5)
+        print(f"   找到 {len(items)} 条 Telegram 消息")
+        return items
+    except ImportError as e:
+        logger.warning("Telegram dependencies are missing: %s", e)
+        print("   Telegram 依赖缺失，跳过")
+        return []
+    except Exception as e:
+        logger.warning("Failed to fetch Telegram: %s", e)
+        print("   Telegram 爬取失败，跳过")
+        return []
+
+
+def _scrape_defillama():
+    """Scrape DefiLlama metrics."""
+    print("正在抓取 DefiLlama 链上指标 (Quant Alpha)...")
+    try:
+        scraper = DefiLlamaScraper()
+        items = scraper.fetch()
+        print(f"   已获取 Perp DEX 核心指标")
+        return items
+    except Exception as e:
+        logger.warning("Failed to fetch DefiLlama: %s", e)
+        return []
+
+
 def _select_per_source(items, per_source: int = 2, total: int = 10):
     """Pick up to `per_source` items from each source, capped at `total`."""
     from src.models.content_item import ContentItem
@@ -231,7 +334,7 @@ def _deduplicate(items):
     return result
 
 
-def _print_stats(analyzed, filepath):
+def _print_stats(analyzed, filepath, queue_path):
     """Print final statistics."""
     source_counts = {}
     for item in analyzed:
@@ -247,6 +350,7 @@ def _print_stats(analyzed, filepath):
     for src, count in source_counts.items():
         print(f"{src}: {count} 条")
     print(f"输出文件：{filepath}")
+    print(f"社媒队列：{queue_path}")
     print(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
 

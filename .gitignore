@@ -29,3 +29,13 @@ outputs/*.md
 !outputs/.gitkeep
 *.log
 .DS_Store
+
+# Local runtime/task state
+.ai/handoffs/*
+!.ai/handoffs/.gitignore
+.ai/tasks/*
+!.ai/tasks/.gitignore
+
+# Secrets and local auth tokens
+secrets/*
+!secrets/.gitkeep

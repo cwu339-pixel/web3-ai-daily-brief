@@ -1,7 +1,7 @@
 # Core dependencies
 requests>=2.31.0
 beautifulsoup4>=4.12.0
-google-generativeai>=0.3.0  # Changed from anthropic to gemini
+openai>=1.58.1
 
 # Data processing
 python-dateutil>=2.8.0
@@ -19,3 +19,11 @@ flake8>=6.0.0
 # Optional
 praw>=7.7.0  # Reddit API
 python-dotenv>=1.0.0  # Environment variables
+google-api-python-client>=2.149.0  # YouTube Data API v3
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.1
+telethon>=1.36.0  # Telegram scraping (optional)
+moviepy>=2.2.1  # Local video rendering
+imageio-ffmpeg>=0.6.0  # Bundled ffmpeg binary for moviepy
+llama-index-readers-bilibili
+bilibili-api-python
