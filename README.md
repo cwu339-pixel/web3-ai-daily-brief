@@ -1,224 +1,183 @@
-# Web3 + AI 每日简报生成器
+# web3-ai-daily-brief
 
-每天早上自动生成 Web3 + AI 领域的精选简报，5 分钟看完当天重要信息。
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Local-First](https://img.shields.io/badge/deployment-local--first-0ea5e9)](#)
+[![Pipeline](https://img.shields.io/badge/pipeline-daily%20briefing-10b981)](#)
+[![AI%20Review](https://img.shields.io/badge/ai%20review-codex%20%2B%20openclaw-f59e0b)](#)
 
-## ✨ 功能特性
+本地优先的 AI/Web3 每日情报流水线：
+抓取多源信号 -> 事件去重 -> OpenAI 分析 -> 生成可执行日报与发布队列。
 
-- 🤖 自动爬取 GitHub Trending（AI + Web3 项目）
-- 📰 抓取 CoinDesk / CoinTelegraph 最新 Web3 新闻
-- 💬 聚合 Reddit r/MachineLearning 热门讨论
-- 🔥 获取 Hacker News AI 相关高分故事
-- 🧠 使用 Google Gemini AI 智能总结和分类
-- 📝 生成精美的 Markdown 格式简报
-- ⭐ 自动评估项目重要性（1-10 分）
-- 🏷️ 智能分类（AI技术/Web3技术/开发工具/其他）
-- ⏰ 支持定时自动运行（launchd）
+## 项目定位
 
-## 📸 效果预览
+这不是“新闻聚合器”，而是一个可以每天稳定产出 **执行卡** 的研究/内容系统。
 
-```markdown
-# Web3 + AI 每日简报 | 2026-02-05
+核心输出：
+- 每日简报（Markdown）
+- 社媒发布队列（JSON）
+- 质量与成本看板（JSON/Markdown）
+- 事件历史与 3/7 天趋势跟踪
 
-## 🤖 AI 技术进展
+## 5 分钟体验路径
 
-### AI技术
-
-**⭐⭐⭐⭐ [bytedance/UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop)**
-
-- 📝 **总结**：开源多模态AI智能体堆栈，连接尖端AI模型与基础设施。
-- 🔧 **语言**：TypeScript
-- 🌟 **今日 Stars**：862
+```bash
+python -m src.cli generate --max 5 --per-source 1
+cat outputs/$(date +%Y-%m-%d)-briefing.md
+cat outputs/$(date +%Y-%m-%d)-quality-cost.json
 ```
 
-## 🚀 快速开始
+你会立刻看到三类结果：`简报`、`执行卡`、`质量成本看板`。
 
-### 1. 安装
+## 现在有什么能力
+
+- 多源抓取：GitHub、CoinDesk、CoinTelegraph、The Block、Blockworks、Reddit、Hacker News、OpenAI Blog、DeepMind Blog、DefiLlama（以及可选 Telegram/Bilibili）
+- 事件级去重：同一事件多来源合并，减少重复噪音
+- AI 结构化分析：每条信号输出 `summary/category/importance` + 执行字段
+- 执行卡输出：`action_item/owner/deadline/execution_risk/expected_gain`
+- 每日质量成本看板：成功率、耗时、token、失败原因、估算费用
+- 本地多 AI 协作流（Codex + OpenClaw）：建议回合、上限门禁、人工仲裁、决议留痕
+
+## 快速开始
+
+### 1) 安装
 
 ```bash
 git clone https://github.com/cwu339-pixel/web3-ai-daily-brief.git
 cd web3-ai-daily-brief
-
-# 创建虚拟环境
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 安装依赖
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API Key
+### 2) 配置
 
 ```bash
-# 复制配置文件
 cp .env.example .env
-
-# 编辑 .env，添加你的 Gemini API key
-# GEMINI_API_KEY=your_gemini_api_key_here
+# 至少配置：OPENAI_API_KEY
 ```
 
-**获取 Gemini API Key：**
-1. 访问 https://aistudio.google.com/apikey
-2. 登录 Google 账号
-3. 创建 API key
-4. 复制到 `.env` 文件
-
-### 3. 使用
+### 3) 生成今天日报
 
 ```bash
-# 生成今日简报
 python -m src.cli generate
+```
 
-# 只生成 AI 简报
+常用参数：
+
+```bash
+python -m src.cli generate --max 5 --per-source 1
 python -m src.cli generate --ai-only
+python -m src.cli generate --web3-only
+python -m src.cli generate --sources github coindesk theblock
+```
 
-# 限制项目数量
-python -m src.cli generate --max 5
+## 输出文件
 
-# 查看生成的简报
+每次运行默认在 `outputs/` 生成：
+
+- `YYYY-MM-DD-briefing.md`：每日简报（含执行卡）
+- `YYYY-MM-DD-social-queue.json`：社媒队列
+- `YYYY-MM-DD-quality-cost.json`：当日质量/成本看板
+- `YYYY-MM-DD-quality-cost.md`：看板 Markdown 版
+- `quality_cost_dashboard.json`：滚动看板（近 60 次）
+- `event_history.json`：事件历史（用于 3/7 天趋势）
+
+快速查看：
+
+```bash
 cat outputs/$(date +%Y-%m-%d)-briefing.md
+cat outputs/$(date +%Y-%m-%d)-quality-cost.json
 ```
 
-## 📁 项目结构
+## 每日定时运行（macOS）
 
+```bash
+./scripts/install_launchd.sh
+# 卸载
+./scripts/uninstall_launchd.sh
 ```
+
+默认每天本地时间 09:00 执行，日志在：
+
+- `outputs/launchd_stdout.log`
+- `outputs/launchd_stderr.log`
+
+你也可以直接跑脚本：
+
+```bash
+./scripts/run_daily_brief.sh
+```
+
+可用环境变量（脚本层）：
+
+- `MAX_ITEMS`（默认 5）
+- `PER_SOURCE`（默认 1）
+- `SOURCES`（默认 all）
+- `MODE`（`both`/`ai-only`/`web3-only`）
+- `AUTO_PUSH_TO_SOCIAL_AGENT`（默认 false）
+
+## 多 AI 协作（Codex + OpenClaw）
+
+最小闭环（双工具）：
+
+```bash
+./scripts/ai/start.sh T300 medium main
+./scripts/ai/flow.sh T300 impl "v1 implemented"
+./scripts/ai/next.sh T300 --run
+```
+
+这套流支持：
+
+- 审查建议回合：`review_suggest -> impl_reply`
+- 回合上限：超限后进入 `human_decision`
+- 人工仲裁：`human_pass` / `human_fail`
+- 决议留痕：`.ai/handoffs/<task_id>/history.jsonl` 与 `decisions.jsonl`
+
+完整说明见：
+- [docs/ai_handoff_workflow.md](docs/ai_handoff_workflow.md)
+
+## 可选扩展
+
+- 推送到社媒代理：`./scripts/push_to_social_agent.sh`
+- 短视频生成与发布：`scripts/run_generate_youtube_*.sh`、`scripts/run_youtube_*.sh`
+- 多平台内容编排：`python scripts/social_pipeline.py --help`
+
+## 最新能力更新
+
+- 协商闭环新增回合上限，避免 `review_suggest -> impl_reply` 无限循环
+- 超过回合上限自动进入 `human_decision`，支持人工仲裁
+- 每条分析结果升级为执行卡字段（动作/负责人/截止/风险/收益）
+- 每次运行自动写质量成本看板（成功率、耗时、token、失败原因）
+- 事件级去重 + 3/7 天连续趋势跟踪
+
+## 测试
+
+```bash
+./venv/bin/python -m pytest -q
+```
+
+## 目录结构
+
+```text
 web3-ai-daily-brief/
 ├── src/
-│   ├── scrapers/                    # 数据爬取模块
-│   │   ├── base_scraper.py          # 抽象基类
-│   │   ├── github_scraper.py        # GitHub Trending 爬虫
-│   │   ├── coindesk_scraper.py      # CoinDesk RSS 新闻
-│   │   ├── cointelegraph_scraper.py # CoinTelegraph RSS 新闻
-│   │   ├── reddit_scraper.py        # Reddit 子版块爬虫
-│   │   ├── hackernews_scraper.py    # Hacker News AI 故事
-│   │   ├── rss_scraper.py           # RSS 通用基类
-│   │   └── market_scraper.py        # 市场数据
-│   ├── analyzer/                    # AI 分析模块
-│   │   ├── summarizer.py            # Gemini API 总结器
-│   │   └── prompt_templates.py      # Prompt 模板
-│   ├── generator/                   # 报告生成模块
-│   │   └── report_builder.py        # Markdown 报告生成
-│   ├── models/                      # 数据模型
-│   │   └── content_item.py          # 统一内容模型
-│   └── cli.py                       # 命令行工具
-├── scripts/                         # 运行脚本
-│   ├── run_daily_brief.sh           # 每日执行脚本
-│   ├── install_launchd.sh           # macOS 定时任务安装
-│   └── uninstall_launchd.sh         # 定时任务卸载
-├── launchd/                         # macOS launchd 配置
-├── tests/                           # 测试文件
-├── outputs/                         # 生成的简报
-│   └── YYYY-MM-DD-briefing.md
-├── examples/                        # 示例脚本
-└── .env                             # 配置文件（需自己创建）
+│   ├── cli.py
+│   ├── analyzer/         # Summarizer + Event Tracker
+│   ├── scrapers/         # 多源抓取
+│   ├── generator/        # 简报/队列生成
+│   └── social/           # 多平台策略与调度
+├── scripts/
+│   ├── run_daily_brief.sh
+│   ├── ai/               # 本地多 AI 协作脚本
+│   └── ...
+├── docs/
+├── tests/
+└── outputs/
 ```
 
-## 🎯 使用场景
+## 备注
 
-1. **每日晨读** - 早上 5 分钟了解最新技术动态
-2. **技术跟踪** - 持续关注 AI 和 Web3 领域进展
-3. **项目发现** - 发现有潜力的开源项目
-4. **投资研究** - Web3 项目投资参考
-
-## 🛠️ 开发
-
-### 运行测试
-
-```bash
-# 运行所有测试
-pytest tests/
-
-# 查看覆盖率
-pytest --cov=src tests/
-```
-
-### 代码风格
-
-```bash
-# 格式化代码
-black src/ tests/
-
-# 检查代码风格
-flake8 src/ tests/
-```
-
-## 📅 开发计划
-
-### ✅ MVP 已完成（v0.1.0）
-- [x] 项目结构搭建
-- [x] GitHub Trending 爬虫
-- [x] Gemini API 集成
-- [x] 报告生成器
-- [x] CLI 工具
-- [x] 端到端测试
-
-### ✅ v0.2.0 已完成
-- [x] CoinDesk RSS 新闻爬虫
-- [x] CoinTelegraph RSS 新闻爬虫
-- [x] Reddit r/MachineLearning 爬虫
-- [x] Hacker News AI 故事爬虫
-- [x] 统一内容模型（ContentItem）
-- [x] macOS launchd 定时自动运行
-
-### 🔜 下一步计划（v0.3.0）
-- [ ] 邮件推送功能
-- [ ] GitHub Actions 自动运行
-- [ ] Web UI 界面
-
-### 💡 未来功能
-- [ ] Telegram Bot 订阅
-- [ ] 关键词订阅（只看特定话题）
-- [ ] 周报/月报汇总
-- [ ] 历史数据分析
-- [ ] 趋势预测
-
-## 🧪 技术栈
-
-- **语言**：Python 3.8+
-- **AI**：Google Gemini 2.5 Flash
-- **爬虫**：requests + BeautifulSoup + feedparser
-- **测试**：pytest
-- **格式化**：black + flake8
-
-## 📊 数据来源
-
-| 来源 | 类型 | 状态 |
-|------|------|------|
-| GitHub Trending | AI + Web3 开源项目 | ✅ 已支持 |
-| CoinDesk | Web3 新闻（RSS） | ✅ 已支持 |
-| CoinTelegraph | Web3 新闻（RSS） | ✅ 已支持 |
-| Reddit r/MachineLearning | AI 社区讨论 | ✅ 已支持 |
-| Hacker News | AI 高分故事 | ✅ 已支持 |
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-**贡献指南：**
-1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交代码 (`git commit -m 'Add amazing feature'`)
-4. 推送分支 (`git push origin feature/amazing-feature`)
-5. 提交 Pull Request
-
-## 📝 许可证
-
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
-## 🙏 致谢
-
-- [GitHub Trending](https://github.com/trending) - 项目数据来源
-- [Google Gemini](https://ai.google.dev/) - AI 分析能力
-- [CoinDesk](https://www.coindesk.com) / [CoinTelegraph](https://cointelegraph.com) - Web3 新闻
-- [Reddit r/MachineLearning](https://www.reddit.com/r/MachineLearning/) - AI 社区讨论
-- [Hacker News](https://news.ycombinator.com) - 技术社区故事
-- [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) - HTML 解析
-- [feedparser](https://feedparser.readthedocs.io/) - RSS 解析
-
-## 📧 联系方式
-
-有问题或建议？欢迎：
-- 提交 [Issue](https://github.com/cwu339-pixel/web3-ai-daily-brief/issues)
-
----
-
-⭐ 如果这个项目对你有帮助，欢迎 Star！
+- 成本估算默认关闭；若要启用，请在 `.env` 里配置：
+  - `OPENAI_INPUT_COST_PER_1M`
+  - `OPENAI_OUTPUT_COST_PER_1M`
+- 该仓库当前为本地工作流优先，适合个人或小团队日更研究/内容场景。
