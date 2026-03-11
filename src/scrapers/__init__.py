@@ -9,6 +9,7 @@ from typing import Dict
 
 __all__ = [
     "GitHubScraper",
+    "XScraper",
     "CoinDeskScraper",
     "CoinTelegraphScraper",
     "RedditScraper",
@@ -18,6 +19,7 @@ __all__ = [
 
 _MODULE_BY_CLASS: Dict[str, str] = {
     "GitHubScraper": "src.scrapers.github_scraper",
+    "XScraper": "src.scrapers.x_scraper",
     "CoinDeskScraper": "src.scrapers.coindesk_scraper",
     "CoinTelegraphScraper": "src.scrapers.cointelegraph_scraper",
     "RedditScraper": "src.scrapers.reddit_scraper",

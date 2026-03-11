@@ -32,7 +32,14 @@ python -m src.cli generate --ai-only
 python -m src.cli generate --web3-only
 
 # 指定来源
-python -m src.cli generate --sources github coindesk theblock
+python -m src.cli generate --sources github x coindesk theblock
+```
+
+如需包含 X 动态（可选），在 `.env` 配置：
+
+```bash
+X_HANDLES=openai,anthropicai
+NITTER_BASE_URL=https://nitter.net
 ```
 
 ## 3. 查看输出

@@ -6,10 +6,20 @@ from enum import Enum
 
 class SourceType(Enum):
     GITHUB = "github"
+    X = "x"
     COINDESK = "coindesk"
     COINTELEGRAPH = "cointelegraph"
     REDDIT = "reddit"
     HACKERNEWS = "hackernews"
+    OPENAI_BLOG = "openai_blog"
+    DEEPMIND_BLOG = "deepmind_blog"
+    BILIBILI = "bilibili"
+    THEBLOCK = "theblock"
+    BLOCKWORKS = "blockworks"
+    DECRYPT = "decrypt"
+    TELEGRAM = "telegram"
+    PROTOCOL_BLOG = "protocol_blog"
+    DEFILLAMA = "defillama"
 
 
 @dataclass(frozen=True)

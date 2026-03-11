@@ -30,7 +30,7 @@ cat outputs/$(date +%Y-%m-%d)-quality-cost.json
 
 ## 现在有什么能力
 
-- 多源抓取：GitHub、CoinDesk、CoinTelegraph、The Block、Blockworks、Reddit、Hacker News、OpenAI Blog、DeepMind Blog、DefiLlama（以及可选 Telegram/Bilibili）
+- 多源抓取：GitHub、X（Nitter RSS）、CoinDesk、CoinTelegraph、The Block、Blockworks、Reddit、Hacker News、OpenAI Blog、DeepMind Blog、DefiLlama（以及可选 Telegram/Bilibili）
 - 事件级去重：同一事件多来源合并，减少重复噪音
 - AI 结构化分析：每条信号输出 `summary/category/importance` + 执行字段
 - 执行卡输出：`action_item/owner/deadline/execution_risk/expected_gain`
@@ -68,7 +68,7 @@ python -m src.cli generate
 python -m src.cli generate --max 5 --per-source 1
 python -m src.cli generate --ai-only
 python -m src.cli generate --web3-only
-python -m src.cli generate --sources github coindesk theblock
+python -m src.cli generate --sources github x coindesk theblock
 ```
 
 ## 输出文件
@@ -115,6 +115,11 @@ cat outputs/$(date +%Y-%m-%d)-quality-cost.json
 - `SOURCES`（默认 all）
 - `MODE`（`both`/`ai-only`/`web3-only`）
 - `AUTO_PUSH_TO_SOCIAL_AGENT`（默认 false）
+
+X 源可选配置（`.env`）：
+
+- `X_HANDLES`：逗号分隔账号，例如 `openai,anthropicai`
+- `NITTER_BASE_URL`：默认 `https://nitter.net`
 
 ## 多 AI 协作（Codex + OpenClaw）
 

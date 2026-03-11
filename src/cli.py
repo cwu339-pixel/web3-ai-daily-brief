@@ -1,14 +1,22 @@
 """Command-line interface"""
 import argparse
+import json
 import logging
 import os
+import time
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 from src.analyzer.summarizer import Summarizer
+from src.analyzer.event_tracker import (
+    EventTracker,
+    canonicalize_url,
+    deduplicate_items_by_event,
+)
 from src.generator.report_builder import ReportBuilder
 from src.models.content_item import ContentItem
 from src.scrapers.coindesk_scraper import CoinDeskScraper
@@ -20,6 +28,7 @@ from src.scrapers.deepmind_blog_scraper import DeepMindBlogScraper
 from src.scrapers.theblock_scraper import TheBlockScraper
 from src.scrapers.blockworks_scraper import BlockworksScraper
 from src.scrapers.defillama_scraper import DefiLlamaScraper
+from src.scrapers.x_scraper import XScraper
 from src.scrapers.github_scraper import (
     AI_KEYWORDS,
     WEB3_KEYWORDS,
@@ -30,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 AVAILABLE_SOURCES = (
     "github",
+    "x",
     "coindesk",
     "cointelegraph",
     "reddit",
@@ -100,6 +110,9 @@ def main():
 
 def generate_briefing(args):
     """Orchestrate: scrape -> analyze -> report."""
+    run_start = time.time()
+    run_date = datetime.now().strftime("%Y-%m-%d")
+
     print("=" * 60)
     print("Web3 + AI 每日简报生成器")
     print("=" * 60)
@@ -122,13 +135,25 @@ def generate_briefing(args):
         print("没有找到相关项目或新闻")
         return
 
+    deduped_items, event_meta = _deduplicate_by_event(all_items)
+    print(f"事件去重：{len(all_items)} -> {len(deduped_items)}")
+
     # Pick up to args.per_source items from each source, total capped at args.max
-    selected = _select_per_source(all_items, per_source=args.per_source, total=args.max)
+    selected = _select_per_source(
+        deduped_items, per_source=args.per_source, total=args.max
+    )
 
     print()
-    print(f"正在使用 OpenAI API 分析 {len(selected)} 条内容（共抓取 {len(all_items)} 条）...")
+    print(
+        f"正在使用 OpenAI API 分析 {len(selected)} 条内容（共抓取 {len(all_items)} 条，去重后 {len(deduped_items)} 条）..."
+    )
     summarizer = Summarizer()
     analyzed = summarizer.batch_summarize(selected, max_items=len(selected))
+    analyzed = _attach_event_metadata(analyzed, event_meta)
+
+    tracker = EventTracker(output_dir=args.output_dir, run_date=run_date)
+    analyzed = tracker.annotate(analyzed)
+    tracker.update(analyzed)
     print(f"   完成 {len(analyzed)} 条内容分析")
     print()
 
@@ -142,7 +167,20 @@ def generate_briefing(args):
     print(f"   社媒队列已生成：{queue_path}")
     print()
 
-    _print_stats(analyzed, filepath, queue_path)
+    dashboard_path = _write_quality_cost_dashboard(
+        output_dir=args.output_dir,
+        run_date=run_date,
+        elapsed_seconds=time.time() - run_start,
+        analyzed=analyzed,
+        selected_count=len(selected),
+        scraped_count=len(all_items),
+        deduped_count=len(deduped_items),
+        summarizer_metrics=summarizer.get_metrics(),
+    )
+    print(f"   质量成本看板：{dashboard_path}")
+    print()
+
+    _print_stats(analyzed, filepath, queue_path, dashboard_path)
 
 
 def _scrape_all_sources(sources, args):
@@ -151,6 +189,9 @@ def _scrape_all_sources(sources, args):
 
     if "github" in sources:
         all_items.extend(_scrape_github(args))
+
+    if "x" in sources:
+        all_items.extend(_scrape_x())
 
     if "coindesk" in sources:
         all_items.extend(_scrape_rss("CoinDesk", CoinDeskScraper()))
@@ -235,6 +276,23 @@ def _scrape_hackernews():
     except Exception as e:
         logger.warning("Failed to fetch HackerNews: %s", e)
         print("   Hacker News 爬取失败，跳过")
+        return []
+
+
+def _scrape_x():
+    """Scrape X feeds from configured handles via Nitter RSS."""
+    print("正在爬取 X 账号动态 (Nitter RSS)...")
+    try:
+        scraper = XScraper()
+        items = scraper.fetch(max_items=10, per_handle=3)
+        if not scraper.handles:
+            print("   未配置 X_HANDLES，跳过")
+            return []
+        print(f"   找到 {len(items)} 条 X 动态")
+        return items
+    except Exception as e:
+        logger.warning("Failed to fetch X: %s", e)
+        print("   X 爬取失败，跳过")
         return []
 
 
@@ -334,7 +392,107 @@ def _deduplicate(items):
     return result
 
 
-def _print_stats(analyzed, filepath, queue_path):
+def _deduplicate_by_event(items):
+    """Collapse multi-source duplicates into event-level items."""
+    deduped, meta = deduplicate_items_by_event(items)
+    return deduped, meta
+
+
+def _attach_event_metadata(analyzed, event_meta):
+    """Attach event metadata onto analyzed dict rows."""
+    attached = []
+    for item in analyzed:
+        key = canonicalize_url(item.get("url", ""))
+        meta = event_meta.get(key, {})
+        attached.append({**item, **meta})
+    return attached
+
+
+def _write_quality_cost_dashboard(
+    output_dir: str,
+    run_date: str,
+    elapsed_seconds: float,
+    analyzed,
+    selected_count: int,
+    scraped_count: int,
+    deduped_count: int,
+    summarizer_metrics,
+):
+    """Write per-run and rolling quality/cost dashboards."""
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fallback_count = sum(
+        1 for row in analyzed if str(row.get("analysis_status", "")) == "fallback"
+    )
+    success_count = max(0, len(analyzed) - fallback_count)
+    success_rate = round((success_count / max(1, selected_count)) * 100.0, 2)
+
+    run_payload = {
+        "run_date": run_date,
+        "generated_at": datetime.now().isoformat(),
+        "duration_seconds": round(float(elapsed_seconds), 2),
+        "scraped_count": int(scraped_count),
+        "deduped_count": int(deduped_count),
+        "selected_count": int(selected_count),
+        "analyzed_count": int(len(analyzed)),
+        "success_count": int(success_count),
+        "fallback_count": int(fallback_count),
+        "success_rate": success_rate,
+        "token_usage": {
+            "prompt_tokens": int(summarizer_metrics.get("prompt_tokens", 0)),
+            "completion_tokens": int(summarizer_metrics.get("completion_tokens", 0)),
+            "total_tokens": int(summarizer_metrics.get("total_tokens", 0)),
+        },
+        "estimated_cost_usd": round(
+            float(summarizer_metrics.get("estimated_cost_usd", 0.0)), 6
+        ),
+        "pricing_configured": bool(summarizer_metrics.get("pricing_configured", False)),
+        "failure_reasons": summarizer_metrics.get("failure_reasons", {}),
+        "api_calls": {
+            "total": int(summarizer_metrics.get("calls_total", 0)),
+            "success": int(summarizer_metrics.get("calls_success", 0)),
+            "failed": int(summarizer_metrics.get("calls_failed", 0)),
+        },
+    }
+
+    daily_json = out_dir / f"{run_date}-quality-cost.json"
+    daily_json.write_text(
+        json.dumps(run_payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    rolling_file = out_dir / "quality_cost_dashboard.json"
+    if rolling_file.exists():
+        try:
+            rolling = json.loads(rolling_file.read_text(encoding="utf-8"))
+        except Exception:
+            rolling = {"runs": []}
+    else:
+        rolling = {"runs": []}
+    runs = rolling.get("runs", [])
+    runs.append(run_payload)
+    rolling["runs"] = runs[-60:]
+    rolling_file.write_text(
+        json.dumps(rolling, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    md_lines = [
+        f"# Quality & Cost Dashboard | {run_date}",
+        "",
+        f"- Duration: `{run_payload['duration_seconds']}s`",
+        f"- Success Rate: `{run_payload['success_rate']}%` ({success_count}/{selected_count})",
+        f"- Scraped -> Deduped -> Selected: `{scraped_count} -> {deduped_count} -> {selected_count}`",
+        f"- Tokens: `{run_payload['token_usage']['total_tokens']}` (prompt {run_payload['token_usage']['prompt_tokens']}, completion {run_payload['token_usage']['completion_tokens']})",
+        f"- Estimated Cost (USD): `{run_payload['estimated_cost_usd']}`",
+        f"- Pricing Configured: `{run_payload['pricing_configured']}`",
+        f"- Failure Reasons: `{json.dumps(run_payload['failure_reasons'], ensure_ascii=False)}`",
+    ]
+    daily_md = out_dir / f"{run_date}-quality-cost.md"
+    daily_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    return str(daily_json)
+
+
+def _print_stats(analyzed, filepath, queue_path, dashboard_path):
     """Print final statistics."""
     source_counts = {}
     for item in analyzed:
@@ -351,6 +509,7 @@ def _print_stats(analyzed, filepath, queue_path):
         print(f"{src}: {count} 条")
     print(f"输出文件：{filepath}")
     print(f"社媒队列：{queue_path}")
+    print(f"质量看板：{dashboard_path}")
     print(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
 
