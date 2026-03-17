@@ -1,0 +1,33 @@
+{
+  "note": "Trimmed example generated from 2026-03-17 run. Top 3 items only.",
+  "date": "2026-03-17",
+  "items": [
+    {
+      "title": "thedotmack/claude-mem",
+      "source": "github",
+      "importance": 9,
+      "summary": "面向Claude的轻量会话记忆插件示范了Agent记忆模块的落地路径，但其商业化与扩展性高度依赖大模型生态和存储策略的选择",
+      "market_impact": "对开发者和AI产品团队在6-18个月内带来正向效率提升与集成速率加快，同时在同一时间窗口放大对Anthropic集中化与隐私合规的关注",
+      "execution_risk": "高度依赖Anthropic/Claude接入规范与API稳定性；存储与隐私合规成本不确定",
+      "evidence_points": "GitHub仓库TypeScript实现并已获1045 Stars，显示社区关注；项目利用Claude agent-sdk做会话压缩与上下文注入，定位为记忆中间件。"
+    },
+    {
+      "title": "Bitcoin just surged past $75,000. Derivatives seem to be driving the rally.",
+      "source": "coindesk",
+      "importance": 9,
+      "summary": "短期由衍生品驱动的资金轮动显著，6-8周内主要利好Perp DEX与稳定币支付，RWA获得边际合规利好，但监管与杠杆回撤构成明显风险边界",
+      "market_impact": "Perp DEX在4-8周内资金流入与手续费上行；稳定币与RWA在3-12月内表现为流动性与合规认知改善；监管突变可立即逆转方向",
+      "execution_risk": "模型对杠杆和流动性波动敏感，监管与市场快变可能导致回撤",
+      "evidence_points": "期货与永续合约持仓与资金费率在近期显著上升，显示衍生品活跃度提高；发布时间 Tue, 17 Mar 2026 01:53:36 +0000，为当期增量事件"
+    },
+    {
+      "title": "AI-linked crypto tokens surge as Nvidia's Jensen Huang touts agentic future",
+      "source": "coindesk",
+      "importance": 9,
+      "summary": "资金更青睐链上AI基础设施和代币化方向",
+      "market_impact": "短期资本向AI-linked代币与AI基础设施倾斜；在3-6个月内将提升Perp DEX和RWA代币的交易深度与波动，同时放大合规化讨论与估值分歧。",
+      "execution_risk": "监管突变或巨头并购改变市场结构，代币短期波动导致头寸损失",
+      "evidence_points": "Nvidia CEO强调agentic AI加速对算力与中间件的需求上升；发布时间 Mon, 16 Mar 2026 22:20:35 +0000，为当期增量事件"
+    }
+  ]
+}

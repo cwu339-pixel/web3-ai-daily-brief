@@ -59,7 +59,19 @@ cat outputs/$(date +%Y-%m-%d)-digest.md
 cat outputs/$(date +%Y-%m-%d)-social-queue.json
 ```
 
-## 4. 常用命令
+## 4. Output Example（建议先看）
+
+- `examples/output-example-digest.md`：一份真实的编辑摘要样例
+- `examples/output-example-social-queue.json`：3 条精简队列样例（判断/影响/风险）
+
+快速查看：
+
+```bash
+cat examples/output-example-digest.md
+cat examples/output-example-social-queue.json
+```
+
+## 5. 常用命令
 
 只跑部分来源：
 
@@ -80,7 +92,7 @@ python -m src.cli generate --ai-only
 python -m src.cli generate --web3-only
 ```
 
-## 5. 目前支持的数据源
+## 6. 目前支持的数据源
 
 - GitHub
 - X（Nitter RSS）
@@ -97,7 +109,7 @@ python -m src.cli generate --web3-only
 
 说明：某些源在网络波动时会偶发失败，系统会跳过并继续产出。
 
-## 6. 前端预览
+## 7. 前端预览
 
 ```bash
 python3 -m http.server 8000
@@ -110,7 +122,7 @@ python3 -m http.server 8000
 - `web/styles.css`
 - `web/app.js`
 
-## 7. 定时运行（macOS）
+## 8. 定时运行（macOS）
 
 ```bash
 ./scripts/install_launchd.sh
@@ -124,16 +136,15 @@ python3 -m http.server 8000
 ./scripts/run_daily_brief.sh
 ```
 
-## 8. 项目定位（面试可用）
+## 9. 项目定位（面试可用）
 
 一句话：
 
 > 我在做一个 Web3/AI 的 daily brief 引擎，把多源新闻和信号稳定转成“判断-影响-风险”，并自动输出日报与分发草稿。
 
-## 9. 进阶文档
+## 10. 进阶文档
 
 - `USAGE.md`：完整 CLI 用法
 - `docs/daily_ops_sop.md`：每日执行 SOP
 - `docs/ai_handoff_workflow.md`：Codex + OpenClaw 协作流
 - `docs/agency_agents_integration.md`：Agent 协同说明
-
