@@ -6,18 +6,21 @@ FOCUS_SECTORS = "Perp DEX | Stablecoin & Payment | RWA Tokenization | AI Infrast
 
 JSON_SCHEMA = """请严格按照以下 JSON 格式输出，不要有任何其他文字：
 {
-  "summary": "业务逻辑总结(中文，约30字)",
+  "summary": "观点化结论句(中文，约30-45字，禁止复述标题，不要写“判断：/立场：/观点：”前缀)",
   "category": "分类名称",
   "importance": 9,
   "action_item": "下一步可执行动作（中文，必须可落地）",
   "owner": "建议负责人（如：研究员/内容运营/工程）",
   "deadline": "截止时间（YYYY-MM-DD）",
   "expected_gain": "预期收益（中文，约30字）",
-  "execution_risk": "执行风险（中文，约30字）",
+  "execution_risk": "执行风险（中文，约30字，不要写“风险：”前缀）",
   "investment_thesis": "核心投资逻辑(中文，约60字)。务必结合 Summer Capital 关注赛道。",
   "risk_factor": "潜在风险(中文，约30字)",
   "competitive_landscape": "竞对/赛道格局：它是谁的对手？在什么身位？(中文，约40字)",
-  "valuation_context": "估值/融资参考：同赛道近期融资规模或二级估值对标(中文，约30字)"
+  "valuation_context": "估值/融资参考：同赛道近期融资规模或二级估值对标(中文，约30字)",
+  "editorial_angle": "可直接发布的核心观点(中文，约35-60字，非事实复述，不要加前缀标签)",
+  "market_impact": "影响对象+时间窗口+方向(中文，约35-60字，不要写“影响：”前缀)",
+  "evidence_points": "最多两条证据点（中文，使用'；'分隔）"
 }"""
 
 
@@ -46,6 +49,10 @@ def _github_prompt(item: ContentItem) -> str:
    - 8-10分：真正的技术创新、赛道填补者、或爆发性增长的硬核项目。
    - 5-7分：优质工具、常规更新。
    - <5分：二次元/娱乐/水贴/教程（此类项目不应出现在简报中）。
+4. 写作口径：
+   - 必须写“判断+影响+风险”，不能只写“发生了什么”。
+   - summary/editorial_angle 禁止改写标题句式；需要体现你的立场。
+   - summary/editorial_angle/market_impact 禁止使用“建议/应该/需要/优先”等指令语气。
 
 {JSON_SCHEMA}"""
 
@@ -71,5 +78,10 @@ def _news_prompt(item: ContentItem) -> str:
 1. 信号强度：这是否预示着资本流向的改变？
 2. 赛道影响：对 Perp DEX 或 RWA 的合规化/流动性有何具体边际贡献？
 3. 估值锚点：该消息是否改变了相关赛道的估值逻辑（例如监管放开、巨头入场）？
+4. 写作口径（必须）：
+   - 不允许“新闻复述”，必须输出“观点化结论”。
+   - 先给判断，再给影响对象和时间窗口，再给风险边界。
+   - 如果证据不足，要明确不确定性来源。
+   - summary/editorial_angle/market_impact 禁止出现“建议/应该/需要/优先”等指令语气。
 
 {JSON_SCHEMA}"""

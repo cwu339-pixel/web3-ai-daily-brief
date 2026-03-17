@@ -1,0 +1,36 @@
+{
+  "date": "2026-03-17",
+  "generated_at": "2026-03-17T12:56:21.266123",
+  "source_digest_title": "衍生品驱动下的资金轮动",
+  "channels": {
+    "x_thread_cn": {
+      "hook": "今天最值得关注的主线：衍生品驱动下的资金轮动",
+      "post": "今天最值得关注的主线：衍生品驱动下的资金轮动\n今日主线：比特币在衍生品和强平驱动下短期暴涨，资金同步向链上AI基础设施与代币化倾斜，RWA与稳定币因支付合规试点和法律可执行性讨论获得边际关注，AI中台与轻量推理成为技术配套重点。\n影响与风险：短期内永续合约、DEX手续费和稳定币流动性上行，为做市与量化策略带机会；中期推动RWA与合规托管的机构认知。风险包括监管突变、杠杆回撤、审计与托管的法律可执行性不足，以及AI模型与数据隐私集中化带来的安全外溢。\n要点：\n- 衍生品与强平为本轮短期行情主因，交易所费率与流动性显著上行\n- 资金向链上AI基础设施与AI-linked代币迁移，轻量推理与记忆中间件受益\n#Web3 #Crypto #AI"
+    },
+    "linkedin_post_en": {
+      "title": "Web3 Daily Signal: 衍生品驱动下的资金轮动",
+      "post": "Today’s Web3 Editorial Brief: 衍生品驱动下的资金轮动\n\n今日主线：比特币在衍生品和强平驱动下短期暴涨，资金同步向链上AI基础设施与代币化倾斜，RWA与稳定币因支付合规试点和法律可执行性讨论获得边际关注，AI中台与轻量推理成为技术配套重点。\n\n影响与风险：短期内永续合约、DEX手续费和稳定币流动性上行，为做市与量化策略带机会；中期推动RWA与合规托管的机构认知。风险包括监管突变、杠杆回撤、审计与托管的法律可执行性不足，以及AI模型与数据隐私集中化带来的安全外溢。\n\nKey takeaways:\n- 衍生品与强平为本轮短期行情主因，交易所费率与流动性显著上行\n- 资金向链上AI基础设施与AI-linked代币迁移，轻量推理与记忆中间件受益\n- RWA/稳定币受支付合规与法律可执行性影响，中期机构参与取决于合规通道\n\nWhat are you seeing on the desk today?"
+    },
+    "newsletter_intro_cn": {
+      "subject_candidate": "今日主线：衍生品驱动下的资金轮动",
+      "intro": "今天我们把市场噪音压缩成一条可判断主线：衍生品驱动下的资金轮动。今日主线：比特币在衍生品和强平驱动下短期暴涨，资金同步向链上AI基础设施与代币化倾斜，RWA与稳定币因支付合规试点和法律可执行性讨论获得边际关注，AI中台与轻量推理成为技术配套重点。"
+    }
+  },
+  "top_signals": [
+    {
+      "title": "thedotmack/claude-mem",
+      "source": "github",
+      "importance": 9
+    },
+    {
+      "title": "Bitcoin just surged past $75,000. Derivatives seem to be driving the rally.",
+      "source": "coindesk",
+      "importance": 9
+    },
+    {
+      "title": "AI-linked crypto tokens surge as Nvidia's Jensen Huang touts agentic future",
+      "source": "coindesk",
+      "importance": 9
+    }
+  ]
+}
