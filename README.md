@@ -148,3 +148,24 @@ python3 -m http.server 8000
 - `docs/daily_ops_sop.md`：每日执行 SOP
 - `docs/ai_handoff_workflow.md`：Codex + OpenClaw 协作流
 - `docs/agency_agents_integration.md`：Agent 协同说明
+
+## 11. Agency 轻量落地（可执行）
+
+新增脚本：`scripts/agency_run.py`  
+作用：把 `agency` 方案从文档变成可执行门禁（Research Gate + QA Block + 最终稿）。
+
+运行：
+
+```bash
+python scripts/agency_run.py --date 2026-03-20 --output-dir outputs
+```
+
+默认规则：
+
+- QA Block：`success_rate >= 80`、`selected_count >= 5`、`fallback_count == 0`
+- Research Gate：`importance >= 9` 且证据包含数字/时间锚点
+
+输出：
+
+- `outputs/YYYY-MM-DD-agency-gate.json`（是否可发布 + 拒绝原因）
+- `outputs/YYYY-MM-DD-agency-card.md`（固定展示格式成稿）

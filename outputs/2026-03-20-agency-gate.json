@@ -1,0 +1,41 @@
+{
+  "date": "2026-03-20",
+  "generated_at": "2026-03-20T20:13:16.812725",
+  "qa": {
+    "passed": true,
+    "reasons": [],
+    "min_success_rate": 80.0,
+    "min_selected_count": 5,
+    "require_zero_fallback": true,
+    "metrics": {
+      "success_rate": 100.0,
+      "selected_count": 12,
+      "fallback_count": 0
+    }
+  },
+  "research": {
+    "min_importance": 9,
+    "require_hard_evidence": true,
+    "approved_count": 11,
+    "rejected_count": 1,
+    "rejected": [
+      {
+        "title": "langchain-ai/open-swe",
+        "source": "github",
+        "importance": 7,
+        "reasons": [
+          "importance<9"
+        ]
+      }
+    ]
+  },
+  "publish_ready": true,
+  "top_titles": [
+    "opendataloader-project/opendataloader-pdf",
+    "Crypto Clarity Act inches toward Senate hearing as lawmakers weigh legislative trades",
+    "DeFi risk management giant Gauntlet sees $380 million exit as OKX crypto campaign ends",
+    "Execution quality is the missing metric in Bitcoin and Ethereum markets",
+    "Bitcoin price tussle at $70K may hint that market bottom is not in",
+    "How we monitor internal coding agents for misalignment"
+  ]
+}
