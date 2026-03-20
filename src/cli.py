@@ -1,4 +1,4 @@
-"""Command-line interface"""
+"""Command-line interface."""
 import argparse
 import json
 import logging
@@ -6,34 +6,33 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file.
 load_dotenv()
 
-from src.analyzer.summarizer import Summarizer
 from src.analyzer.event_tracker import (
     EventTracker,
     canonicalize_url,
     deduplicate_items_by_event,
 )
+from src.analyzer.summarizer import Summarizer
 from src.generator.report_builder import ReportBuilder
 from src.models.content_item import ContentItem
+from src.scrapers.blockworks_scraper import BlockworksScraper
 from src.scrapers.coindesk_scraper import CoinDeskScraper
 from src.scrapers.cointelegraph_scraper import CoinTelegraphScraper
-from src.scrapers.hackernews_scraper import HackerNewsScraper
-from src.scrapers.reddit_scraper import RedditScraper
-from src.scrapers.openai_blog_scraper import OpenAIBlogScraper
 from src.scrapers.deepmind_blog_scraper import DeepMindBlogScraper
-from src.scrapers.theblock_scraper import TheBlockScraper
-from src.scrapers.blockworks_scraper import BlockworksScraper
 from src.scrapers.defillama_scraper import DefiLlamaScraper
+from src.scrapers.github_scraper import AI_KEYWORDS, WEB3_KEYWORDS, GitHubScraper
+from src.scrapers.hackernews_scraper import HackerNewsScraper
+from src.scrapers.openai_blog_scraper import OpenAIBlogScraper
+from src.scrapers.reddit_scraper import RedditScraper
+from src.scrapers.rwa_analytics_scraper import RWAAnalyticsScraper
+from src.scrapers.rwa_protocol_scraper import RWAProtocolScraper
+from src.scrapers.theblock_scraper import TheBlockScraper
 from src.scrapers.x_scraper import XScraper
-from src.scrapers.github_scraper import (
-    AI_KEYWORDS,
-    WEB3_KEYWORDS,
-    GitHubScraper,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +50,11 @@ AVAILABLE_SOURCES = (
     "blockworks",
     "telegram",
     "defillama",
+    "rwa_protocols",
 )
 
 
-def main():
+def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         description="Web3 + AI 每日简报生成器",
@@ -80,21 +80,13 @@ def main():
         default=["all"],
         help="选择数据源（默认全部）",
     )
+    parser.add_argument("--ai-only", action="store_true", help="只爬取 AI 项目")
+    parser.add_argument("--web3-only", action="store_true", help="只爬取 Web3 项目")
+    parser.add_argument("--max", type=int, default=12, help="分析总条数上限（默认 12）")
     parser.add_argument(
-        "--ai-only", action="store_true", help="只爬取 AI 项目"
+        "--per-source", type=int, default=2, help="每个数据源最多取几条（默认 2）"
     )
-    parser.add_argument(
-        "--web3-only", action="store_true", help="只爬取 Web3 项目"
-    )
-    parser.add_argument(
-        "--max", type=int, default=5, help="分析总条数上限（默认 5）"
-    )
-    parser.add_argument(
-        "--per-source", type=int, default=1, help="每个数据源最多取几条（默认 1）"
-    )
-    parser.add_argument(
-        "--output-dir", default="outputs", help="输出目录（默认 outputs）"
-    )
+    parser.add_argument("--output-dir", default="outputs", help="输出目录（默认 outputs）")
     parser.add_argument(
         "--bilibili-urls",
         nargs="+",
@@ -108,8 +100,8 @@ def main():
         generate_briefing(args)
 
 
-def generate_briefing(args):
-    """Orchestrate: scrape -> analyze -> report."""
+def generate_briefing(args) -> None:
+    """Orchestrate: scrape -> analyze -> report -> queue -> quality dashboard."""
     run_start = time.time()
     run_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -123,11 +115,7 @@ def generate_briefing(args):
         print("请在 .env 文件中配置 API key")
         return
 
-    sources = (
-        list(AVAILABLE_SOURCES)
-        if "all" in args.sources
-        else list(args.sources)
-    )
+    sources = list(AVAILABLE_SOURCES) if "all" in args.sources else list(args.sources)
 
     all_items = _scrape_all_sources(sources, args)
 
@@ -138,10 +126,7 @@ def generate_briefing(args):
     deduped_items, event_meta = _deduplicate_by_event(all_items)
     print(f"事件去重：{len(all_items)} -> {len(deduped_items)}")
 
-    # Pick up to args.per_source items from each source, total capped at args.max
-    selected = _select_per_source(
-        deduped_items, per_source=args.per_source, total=args.max
-    )
+    selected = _select_per_source(deduped_items, per_source=args.per_source, total=args.max)
 
     print()
     print(
@@ -159,12 +144,33 @@ def generate_briefing(args):
 
     print("正在生成 Markdown 简报...")
     builder = ReportBuilder(output_dir=args.output_dir)
-    filepath = builder.generate_report(items=analyzed)
-    print(f"   简报已生成：{filepath}")
+    briefing_path = builder.generate_report(items=analyzed)
+    print(f"   简报已生成：{briefing_path}")
     print()
 
     queue_path = builder.generate_social_queue(items=analyzed, max_posts=args.max)
     print(f"   社媒队列已生成：{queue_path}")
+    print()
+
+    digest_path = builder.generate_editorial_digest(items=analyzed, date=run_date, max_items=args.max)
+    print(f"   编辑摘要已生成：{digest_path}")
+    story_card_path = os.path.join(args.output_dir, f"{run_date}-story-card.md")
+    if os.path.exists(story_card_path):
+        print(f"   固定展示稿已生成：{story_card_path}")
+    print()
+
+    digest_payload = {}
+    try:
+        digest_payload = json.loads(Path(digest_path).read_text(encoding="utf-8"))
+    except Exception as err:
+        logger.warning("Failed to read digest json at %s: %s", digest_path, err)
+    drafts_path = builder.generate_distribution_drafts(
+        items=analyzed,
+        digest=digest_payload,
+        date=run_date,
+        max_items=min(args.max, 3),
+    )
+    print(f"   分发草稿已生成：{drafts_path}")
     print()
 
     dashboard_path = _write_quality_cost_dashboard(
@@ -180,7 +186,7 @@ def generate_briefing(args):
     print(f"   质量成本看板：{dashboard_path}")
     print()
 
-    _print_stats(analyzed, filepath, queue_path, dashboard_path)
+    _print_stats(analyzed, briefing_path, queue_path, digest_path, drafts_path, dashboard_path)
 
 
 def _scrape_all_sources(sources, args):
@@ -204,7 +210,7 @@ def _scrape_all_sources(sources, args):
 
     if "deepmind_blog" in sources:
         all_items.extend(_scrape_rss("DeepMind Blog", DeepMindBlogScraper()))
-        
+
     if "theblock" in sources:
         all_items.extend(_scrape_rss("The Block", TheBlockScraper()))
 
@@ -213,10 +219,13 @@ def _scrape_all_sources(sources, args):
 
     if "telegram" in sources:
         all_items.extend(_scrape_telegram())
-        
+
     if "defillama" in sources:
         all_items.extend(_scrape_defillama())
-        
+
+    if "rwa_protocols" in sources:
+        all_items.extend(_scrape_rwa_protocols())
+
     if "bilibili" in sources:
         all_items.extend(_scrape_bilibili(args))
 
@@ -233,12 +242,15 @@ def _scrape_bilibili(args):
     """Scrape Bilibili videos from URLs."""
     if not args.bilibili_urls:
         return []
-    
+
     print("正在爬取 Bilibili 视频文本...")
     try:
         from src.scrapers.bilibili_scraper import BilibiliScraper
+
         scraper = BilibiliScraper()
-        items = scraper.fetch(video_urls=args.bilibili_urls, max_items=len(args.bilibili_urls))
+        items = scraper.fetch(
+            video_urls=args.bilibili_urls, max_items=len(args.bilibili_urls)
+        )
         print(f"   找到 {len(items)} 个 Bilibili 视频的文本")
         return items
     except ImportError as e:
@@ -303,9 +315,7 @@ def _scrape_github(args):
 
     if not args.web3_only:
         print("正在爬取 GitHub Trending (AI 项目)...")
-        ai_items = scraper.filter_by_keywords(
-            scraper.fetch(since="daily"), AI_KEYWORDS
-        )
+        ai_items = scraper.filter_by_keywords(scraper.fetch(since="daily"), AI_KEYWORDS)
         print(f"   找到 {len(ai_items)} 个 AI 相关项目")
         items.extend(ai_items)
 
@@ -338,6 +348,7 @@ def _scrape_telegram():
     print("正在爬取 Telegram 频道 (Telethon)...")
     try:
         from src.scrapers.telegram_scraper import TelegramScraper
+
         scraper = TelegramScraper()
         items = scraper.fetch(max_items=5)
         print(f"   找到 {len(items)} 条 Telegram 消息")
@@ -358,16 +369,32 @@ def _scrape_defillama():
     try:
         scraper = DefiLlamaScraper()
         items = scraper.fetch()
-        print(f"   已获取 Perp DEX 核心指标")
+        print("   已获取 Perp DEX 核心指标")
         return items
     except Exception as e:
         logger.warning("Failed to fetch DefiLlama: %s", e)
         return []
 
 
+def _scrape_rwa_protocols():
+    """Scrape RWA protocol news and analytics."""
+    print("正在抓取 RWA 协议信号...")
+    items = []
+    try:
+        items.extend(RWAAnalyticsScraper().fetch())
+    except Exception as e:
+        logger.warning("Failed to fetch RWA analytics: %s", e)
+    try:
+        items.extend(RWAProtocolScraper().fetch(max_items=5))
+    except Exception as e:
+        logger.warning("Failed to fetch RWA protocol feeds: %s", e)
+
+    print(f"   找到 {len(items)} 条 RWA 相关信号")
+    return items
+
+
 def _select_per_source(items, per_source: int = 2, total: int = 10):
     """Pick up to `per_source` items from each source, capped at `total`."""
-    from src.models.content_item import ContentItem
     counts: dict = {}
     selected = []
     for item in items:
@@ -492,7 +519,7 @@ def _write_quality_cost_dashboard(
     return str(daily_json)
 
 
-def _print_stats(analyzed, filepath, queue_path, dashboard_path):
+def _print_stats(analyzed, filepath, queue_path, digest_path, drafts_path, dashboard_path):
     """Print final statistics."""
     source_counts = {}
     for item in analyzed:
@@ -509,6 +536,8 @@ def _print_stats(analyzed, filepath, queue_path, dashboard_path):
         print(f"{src}: {count} 条")
     print(f"输出文件：{filepath}")
     print(f"社媒队列：{queue_path}")
+    print(f"编辑摘要：{digest_path}")
+    print(f"分发草稿：{drafts_path}")
     print(f"质量看板：{dashboard_path}")
     print(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()

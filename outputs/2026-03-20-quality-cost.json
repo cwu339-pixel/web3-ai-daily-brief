@@ -1,0 +1,25 @@
+{
+  "run_date": "2026-03-20",
+  "generated_at": "2026-03-20T09:09:09.995428",
+  "duration_seconds": 543.46,
+  "scraped_count": 61,
+  "deduped_count": 61,
+  "selected_count": 12,
+  "analyzed_count": 12,
+  "success_count": 12,
+  "fallback_count": 0,
+  "success_rate": 100.0,
+  "token_usage": {
+    "prompt_tokens": 8421,
+    "completion_tokens": 36146,
+    "total_tokens": 44567
+  },
+  "estimated_cost_usd": 0.0,
+  "pricing_configured": false,
+  "failure_reasons": {},
+  "api_calls": {
+    "total": 12,
+    "success": 12,
+    "failed": 0
+  }
+}

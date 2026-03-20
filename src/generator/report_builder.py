@@ -214,7 +214,80 @@ class ReportBuilder:
             md_lines.append(f"- {point}")
         with open(md_path, "w", encoding="utf-8") as f:
             f.write("\n".join(md_lines) + "\n")
+
+        story_card_path = os.path.join(self.output_dir, f"{date}-story-card.md")
+        self._write_story_card(
+            path=story_card_path,
+            items=deduped,
+            digest=digest,
+        )
         return filepath
+
+    def _write_story_card(self, path: str, items: List[Dict[str, Any]], digest: Dict[str, Any]) -> None:
+        ranked = sorted(items, key=lambda row: int(row.get("importance", 0) or 0), reverse=True)
+        top_items = ranked[:6]
+
+        title = self._sanitize_text(digest.get("title"), "今日主线")
+        one_line = self._tighten_sentence(
+            self._sanitize_text(digest.get("summary_paragraph"), self._fallback_summary_text(top_items)),
+            max_chars=120,
+        )
+        impact_risk = self._tighten_sentence(
+            self._sanitize_text(digest.get("focus_paragraph"), self._fallback_focus_text(top_items)),
+            max_chars=140,
+        )
+
+        lines = [
+            "主标题",
+            title,
+            "",
+            "一句话主线",
+            one_line,
+            "",
+            "影响与风险",
+            impact_risk,
+            "",
+            "Top 6 信号",
+            "",
+        ]
+
+        for item in top_items:
+            title_text = str(item.get("title", "Untitled")).strip()
+            raw_summary = str(item.get("summary", "")).strip()
+            raw_impact = str(item.get("market_impact", "")).strip()
+            raw_risk = str(item.get("execution_risk", "")).strip()
+
+            summary, parsed_impact, parsed_risk = self._extract_structured_fields(raw_summary)
+            if not raw_impact:
+                raw_impact = parsed_impact
+            if not raw_risk:
+                raw_risk = parsed_risk
+
+            summary = self._strip_leading_label(self._strip_action_phrases(summary or raw_summary), "判断")
+            summary = self._strip_leading_label(summary, "立场")
+            summary = self._strip_leading_label(summary, "观点")
+            impact = self._strip_leading_label(self._strip_action_phrases(raw_impact), "影响")
+            impact = self._strip_leading_label(impact, "市场影响")
+            risk = self._strip_leading_label(raw_risk, "风险")
+            risk = self._strip_leading_label(risk, "风险边界")
+
+            summary = self._tighten_sentence(summary, max_chars=78)
+            impact = self._tighten_sentence(impact, max_chars=96)
+            risk = self._tighten_sentence(risk, max_chars=72)
+            evidence = self._tighten_sentence(str(item.get("evidence_points", "")).strip(), max_chars=88)
+            lines.extend(
+                [
+                    title_text,
+                    f"判断：{summary or '-'}",
+                    f"影响：{impact or '-'}",
+                    f"风险：{risk or '-'}",
+                    f"证据：{evidence or '-'}",
+                    "",
+                ]
+            )
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines).strip() + "\n")
 
     def _should_use_model_digest(self) -> bool:
         flag = str(os.getenv("EDITORIAL_DIGEST_USE_MODEL", "1")).strip().lower()
